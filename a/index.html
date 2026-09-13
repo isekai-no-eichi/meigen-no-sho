@@ -288,7 +288,7 @@ function saveFavs() { try { localStorage.setItem('bookexp-favs', JSON.stringify(
 const seenEl = document.getElementById('seen'); const seenSet = new Set();
 function updateSeen() {
   if (deck[index] != null) seenSet.add(deck[index]);
-  seenEl.innerHTML = '<b>' + seenSet.size + '</b>枚目';
+  seenEl.innerHTML = '<b>' + (index + 1) + '</b>枚目';   // v43 KEI: 今開いているページの番号(戻れば減る)。seenSet は統計用に残す
 }
 function updateFavUI() {
   updateSeen();

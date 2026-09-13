@@ -236,7 +236,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 const $ = id => document.getElementById(id);
-const BUILD = '20260907v42';
+const BUILD = '20260913v43';
 
 // ============================================================ 設定(読書側 a/ と共有キー)
 const DEFAULTS = { bgm:true, rain:true, insects:false, candle:false, amb:0.6, flip:1.0, flipOn:true, rainKind:'study', bgmVol:0.5 };
@@ -813,9 +813,10 @@ function beginRead(hash, title){
   }, 5900);
 }
 $('bOpen').onclick = () => beginRead('#read');
-$('bFav').onclick = () => beginRead('#fav', '印のページ');
+// v43 KEI: お気に入りが0枚なら主が一言
+$('bFav').onclick = () => { if (favCount() > 0) beginRead('#fav', '印のページ'); else say('お気に入りは、まだ登録されていませんね', null, { small:true, hold:2500 }); };
 // 栞から読む(v25 KEI): 栞が無ければ主が一言
-$('bResume').onclick = () => { if (hasBookmark()) beginRead('#resume'); else say('栞は、まだ挟まれていませんね', null, { small:true, hold:2500 }); };
+$('bResume').onclick = () => { if (hasBookmark()) beginRead('#resume'); else say('しおりは、まだ挟まれていませんね', null, { small:true, hold:2500 }); };
 $('mFresh').onclick = () => beginRead('#fresh');
 
 // 読書側からの合図
