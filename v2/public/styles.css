@@ -120,6 +120,12 @@ html,body{margin:0;overflow:hidden;overscroll-behavior:none;font-family:var(--se
 #readTitle .main{font-size:min(11vw,64px);font-weight:500;letter-spacing:.3em;text-indent:.3em;white-space:nowrap;text-shadow:0 0 26px rgba(233,207,126,.55),0 2px 12px rgba(0,0,0,.9)}
 #readTitle .rule{width:min(56vw,330px);height:1px;margin:14px auto;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
 #readTitle.show{opacity:1;filter:blur(0)}
+/* 開く時のタイトルカード「名言の書」（2026-09-13 KEI 復活。旧 app/ v8 と同じ見せ方） */
+#readTitle{position:fixed;left:0;right:0;top:36%;text-align:center;pointer-events:none;z-index:21;font-family:var(--serif);color:var(--gold2);
+  opacity:0;filter:blur(14px);transition:opacity 1.2s ease,filter 1.2s ease}
+#readTitle .main{font-size:min(11vw,64px);font-weight:500;letter-spacing:.3em;text-indent:.3em;white-space:nowrap;text-shadow:0 0 26px rgba(233,207,126,.55),0 2px 12px rgba(0,0,0,.9)}
+#readTitle .rule{width:min(56vw,330px);height:1px;margin:14px auto;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+#readTitle.show{opacity:1;filter:blur(0)}
 #fade{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity 1.1s ease-in;z-index:30}
 /* 開く瞬間に溢れる光（暗転のかわり。白飛びさせず、一瞬で引く） */
 #flash{position:fixed;inset:0;pointer-events:none;z-index:31;opacity:0;mix-blend-mode:screen;

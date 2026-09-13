@@ -24,7 +24,7 @@ const $ = (id: string) => document.getElementById(id) as HTMLElement;
 const canvas = document.getElementById('c') as HTMLCanvasElement;
 
 // ---- 画面に足す要素（HTML を小さく保つ） ----
-// タイトルカード「名言の書」は出さない（2026-09-07 KEI: 表紙の箔押しに置き換えた）。
+// タイトルカード「名言の書」は開く時に出す（2026-09-13 KEI 復活。09-07 に消したが「あった方がいい」）。
 const fade = document.createElement('div');
 fade.id = 'fade';
 document.body.appendChild(fade);
@@ -151,7 +151,10 @@ function beginRead(mode: string, title?: string): void {
   // **await や setTimeout より前**に呼ばないとブラウザに断られる。
   fsEnter();
   fsRetry = false;
-  void title;
+  const rt = $('readTitle');
+  rt.querySelector('.main')!.textContent = title || '名言の書';
+  rt.classList.add('show');
+  setTimeout(() => rt.classList.remove('show'), 2400);
   setStage('opening');
   ui.setLocked(true);
   ensureAudio();
