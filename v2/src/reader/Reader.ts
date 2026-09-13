@@ -357,7 +357,7 @@ export class Reader {
   // ---------------------------------------------------------- 印・栞・UI
   private updateSeen(): void {
     if (this.deck[this.index] != null) this.seenSet.add(this.deck[this.index]);
-    this.el.seen.innerHTML = '<b>' + this.seenSet.size + '</b>枚目';
+    this.el.seen.innerHTML = '<b>' + (this.index + 1) + '</b>枚目';   // 2026-09-13 KEI: 今開いているページの番号（戻れば減る）。seenSet は統計用
   }
   private updateFavUI(): void {
     this.updateSeen();

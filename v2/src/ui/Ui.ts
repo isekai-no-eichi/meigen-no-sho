@@ -92,12 +92,12 @@ export class Ui {
     this.bResume.addEventListener('click', () => {
       if (this.locked) return;
       if (hasBookmark()) this.hooks.onOpen('resume');
-      else this.hooks.onSay('栞は、まだ挟まれていませんね');
+      else this.hooks.onSay('しおりは、まだ挟まれていません');
     });
     this.bFav.addEventListener('click', () => {
       if (this.locked) return;
       if (favCount() > 0) this.hooks.onOpen('fav', 'お気に入りのページ');
-      else this.hooks.onSay('お気に入りのページは、まだありませんね');
+      else this.hooks.onSay('お気に入りは、まだ登録されていません');
     });
     this.updateEntry();
     $('a2hsX').addEventListener('click', () => this.closeA2hs());
@@ -114,12 +114,13 @@ export class Ui {
   }
 
   /**
-   * 入口ボタンは「中身がある時だけ」出す（2026-09-09 KEI）。
-   * 栞も印も無い＝本と一文だけの画面になる。
+   * 入口ボタンは常に出す（2026-09-13 KEI・他者フィードバック）。
+   * 中身が無い時は押すと「まだ挟まれていません／まだ登録されていません」の一言。
+   * （2026-09-09の「中身がある時だけ出す」は撤回）
    */
   updateEntry(): void {
-    this.bResume.hidden = !hasBookmark();
-    this.bFav.hidden = favCount() === 0;
+    this.bResume.hidden = false;
+    this.bFav.hidden = false;
   }
 
   /** 本が現れたら呼ぶ。UIを出し、5秒後に一文が浮かぶ */
