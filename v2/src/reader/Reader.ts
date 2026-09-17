@@ -120,7 +120,7 @@ export class Reader {
 <canvas id="dust"></canvas>
 <div id="seen"></div>
 <div id="backBtn">‹ 戻る</div>
-<div id="favBtn" role="button" tabindex="0" aria-label="お気に入り"><b>♡</b><span>お気に入り</span></div>
+<div id="favBtn" role="button" tabindex="0" aria-label="印"><b>♡</b><span>印</span></div>
 <div id="favListBtn" role="button" tabindex="0" aria-label="栞"><b><svg width="14" height="18" viewBox="0 0 14 18" fill="none" stroke="#c9a24a" stroke-width="1.3"><path d="M2 1h10v16l-5-4-5 4z"/></svg></b><span>栞</span></div>
 <div id="setBtn" role="button" tabindex="0" aria-label="音の入切"><b></b><span>音</span></div>
 <div id="toast"></div>
@@ -365,7 +365,7 @@ export class Reader {
     this.el.favListBtn.classList.toggle('on', bmHere);
     if (bmHere) this.showRibbon(false); else this.hideRibbon();
     const on = this.favs.includes(this.deck[this.index]);
-    this.el.favBtn.querySelector('span')!.textContent = 'お気に入り';
+    this.el.favBtn.querySelector('span')!.textContent = '印';
     this.el.favBtn.querySelector('b')!.textContent = on ? '♥' : '♡';
     this.el.favBtn.classList.toggle('on', on);
   }
@@ -867,8 +867,8 @@ export class Reader {
       this.firstTouch();
       const p = this.deck[this.index];
       const i = this.favs.indexOf(p);
-      if (i >= 0) { this.favs.splice(i, 1); sealSound(false); haptic(6); this.toast('お気に入りを外しました'); }
-      else { this.favs.push(p); this.favStamp = { t0: performance.now() }; sealSound(true); haptic([10, 20, 15]); this.stampAnim(); this.toast('このページをお気に入りにしました'); }
+      if (i >= 0) { this.favs.splice(i, 1); sealSound(false); haptic(6); this.toast('印を外しました'); }
+      else { this.favs.push(p); this.favStamp = { t0: performance.now() }; sealSound(true); haptic([10, 20, 15]); this.stampAnim(); this.toast('このページに印をつけました'); }
       saveFavs(this.favs); this.updateFavUI();
       this.hooks.onFav({ count: this.favs.length, on: i < 0 });
     });

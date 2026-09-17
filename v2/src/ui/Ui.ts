@@ -67,9 +67,9 @@ export class Ui {
   </div>
   <div class="tab" data-tab="2" hidden>
     <p class="h">お気に入り</p>
-    <p>残しておきたい名言を見つけたら、<br>画面の下にある<span class="k">【お気に入り】</span>を押す。</p>
+    <p>残しておきたい名言を見つけたら、<br>画面の下にある<span class="k">【印】</span>を押す。</p>
     <p>印をつけた名言は、<br>最初の画面にある<span class="k">【お気に入りを読む】</span>から、まとめて読み返すことができる。</p>
-    <p>もう一度<span class="k">【お気に入り】</span>を押せば、その名言はお気に入りから外れる。</p>
+    <p>もう一度<span class="k">【印】</span>を押せば、その名言はお気に入りから外れる。</p>
     <p class="last">あとでまた読みたいと思った名言があれば使ってほしい。</p>
   </div>
   </div>
