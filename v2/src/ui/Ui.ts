@@ -47,21 +47,15 @@ export class Ui {
   <button class="seal wide" id="bFav" aria-label="お気に入りを読む" hidden>お気に入りを読む</button>
 </div>
 <div id="a2hs"><span>ホーム画面に追加すると、枠のない全画面で読める</span><button id="a2hsX" aria-label="閉じる">✕</button></div>
-<div class="ov" id="menu"><div class="box letter">
-  <div class="lhead">
-    <h2>この本について</h2>
-    <div class="lrule"></div>
-  </div>
+<div class="ov" id="menu"><div class="box letter frame">
   <div class="lbody" id="letterBody">
   <div class="tab" data-tab="0">
-    <p>この本は、魔法の書だ。</p>
-    <p>異世界の叡智がこれまでに集めてきた名言が、一枚残らず挟まっている。</p>
-    <p>魔法の書だから、開くたびに中身が変わる。同じ並びで開くことは二度とない。</p>
-    <p>噂では、この本はいまも厚みを増しているらしい。名言が見つかるたびに、新しい一枚が静かに綴じられていく。</p>
-    <p>死のうとしていた人がいた。生きる希望を失った人がいた。恋に破れた人、行き先を見失った人、迷ったまま動けなくなった人もいた。</p>
-    <p>その人たちがこの本を開き、一枚の名言に出会い、考えが変わった。この本に救われた人は、たくさんいる。</p>
-    <p>だから、いまのあなたに合う名言も、必ずこの中にある。</p>
-    <p class="last">一枚でいい。あなたは必ず、その一枚に出会うことができる。</p>
+    <p class="h">この本について</p>
+    <p>ただの本ではない。<br>開くたびに、中身が変わる。<br>そして今も、増え続けている。</p>
+    <p>この本に救われた人は、たくさんいる。</p>
+    <p>失恋した人。<br>仕事がうまくいかなかった人。<br>生きる意味がわからなくなった人。<br>自ら命を絶とうとした人を、止めたことだってある。</p>
+    <p>言葉には、それだけの力がある。</p>
+    <p class="last">だから、悩んだとき、行き詰まったとき、この本を開いてほしい。<br>今のあなたにぴったりの一枚と、きっと出会えるはずだ。</p>
   </div>
   <div class="tab" data-tab="1" hidden>
     <p class="h">しおり</p>
