@@ -128,9 +128,16 @@ html,body{margin:0;overflow:hidden;overscroll-behavior:none;font-family:var(--se
   padding:0;display:flex;flex-direction:column;
   color:var(--paper);background:none;border-radius:0}
 #menu .box.letter.frame{border-width:22px;border-image-width:22px}
+#menu .lwrap{position:relative;flex:1 1 auto;min-height:0;display:flex}
 #menu .lbody{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;
   padding:6px 8px 4px}
 #menu .lbody::-webkit-scrollbar{display:none}
+/* 続きがある側だけ、本文が黒革に沈む影（2026-09-17 v8 KEI）。高さ=本文3行ぶん */
+#menu .lfade{position:absolute;left:0;right:0;height:calc(2.1em * 3);pointer-events:none;z-index:2;
+  font-size:clamp(14.5px,4.1vmin,17px);opacity:0;transition:opacity .2s ease}
+#menu .lfade.show{opacity:1}
+#menu .lfade.bot{bottom:0;background:linear-gradient(to bottom,rgba(16,11,7,0) 0%,rgba(16,11,7,.55) 52%,rgba(16,11,7,.94) 100%)}
+#menu .lfade.top{top:0;background:linear-gradient(to top,rgba(16,11,7,0) 0%,rgba(16,11,7,.50) 52%,rgba(16,11,7,.90) 100%)}
 /* 本文（黒革の上・羊皮紙色の文字） */
 #menu .box.letter .tab p{color:var(--paper);font-family:var(--serif);font-size:clamp(14.5px,4.1vmin,17px);line-height:2.1;letter-spacing:.05em;
   margin:0 0 1.5em;white-space:normal;word-break:normal;min-height:0;text-shadow:0 1px 2px rgba(0,0,0,.55)}

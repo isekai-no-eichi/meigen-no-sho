@@ -31,6 +31,8 @@ export class Ui {
   private bClearBm!: HTMLButtonElement;
   private bFav!: HTMLButtonElement;
   private letterBody!: HTMLElement;
+  private fadeTop!: HTMLElement;
+  private fadeBot!: HTMLElement;
   private hintTimer: ReturnType<typeof setTimeout> | null = null;
   private tabIdx = 0;
   private lastTap = 0;
@@ -48,6 +50,7 @@ export class Ui {
 </div>
 <div id="a2hs"><span>ホーム画面に追加すると、枠のない全画面で読める</span><button id="a2hsX" aria-label="閉じる">✕</button></div>
 <div class="ov" id="menu"><div class="box letter frame">
+  <div class="lwrap">
   <div class="lbody" id="letterBody">
   <div class="tab" data-tab="0">
     <p class="h">この本について</p>
@@ -73,6 +76,9 @@ export class Ui {
     <p class="last">あとでまた読みたいと思った名言があれば使ってほしい。</p>
   </div>
   </div>
+  <div class="lfade top" id="lfadeTop"></div>
+  <div class="lfade bot" id="lfadeBot"></div>
+  </div>
   <div class="lnav">
     <button class="lbtn" id="tabPrev">前のページ</button>
     <span class="lnum" id="tabNum">1 / ${LETTER_PAGES}</span>
@@ -85,6 +91,10 @@ export class Ui {
     const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
     this.hint = $('hint'); this.ui = $('ui'); this.menu = $('menu'); this.a2hs = $('a2hs');
     this.letterBody = $('letterBody');
+    this.fadeTop = $('lfadeTop'); this.fadeBot = $('lfadeBot');
+    // 本文が続いていることを示す上下の影（2026-09-17 KEI）。端まで来たらその側だけ消す
+    this.letterBody.addEventListener('scroll', () => this.paintFades(), { passive: true });
+    addEventListener('resize', () => this.paintFades());
 
     const stop = (e: Event) => e.stopPropagation();
     this.ui.addEventListener('pointerdown', stop);
@@ -194,6 +204,20 @@ export class Ui {
     document.querySelectorAll<HTMLElement>('#menu .tab').forEach(el => { el.hidden = +(el.dataset.tab || '0') !== this.tabIdx; });
     (document.getElementById('tabNum') as HTMLElement).textContent = (this.tabIdx + 1) + ' / ' + LETTER_PAGES;
     this.letterBody.scrollTop = 0;                 // ページを送ったら手紙の頭から
+    this.paintFades();
+    requestAnimationFrame(() => this.paintFades());   // 文字が組まれてから測り直す
+  }
+
+  /**
+   * 本文の上下の影。まだ続きがある側だけ出す（2026-09-17 KEI）。
+   *   下: 一番下まで読んだら消える。 上: 少しでもスクロールしたら出る。
+   *   枠に収まっているページでは上下とも出ない。
+   */
+  private paintFades(): void {
+    const el = this.letterBody;
+    const rest = el.scrollHeight - el.scrollTop - el.clientHeight;
+    this.fadeBot.classList.toggle('show', rest > 8);
+    this.fadeTop.classList.toggle('show', el.scrollTop > 8);
   }
 
   /** 本の画面に音のボタンは置かない（2026-09-09 KEI）。音の入切は読書画面の「音」ボタンで行う */
