@@ -127,17 +127,17 @@ html,body{margin:0;overflow:hidden;overscroll-behavior:none;font-family:var(--se
   color:#34271a;border-radius:2px;
   background:
     radial-gradient(ellipse 78% 58% at 22% 10%,rgba(255,252,240,.40),transparent 66%),
-    radial-gradient(ellipse 70% 58% at 84% 94%,rgba(96,72,36,.26),transparent 66%),
+    radial-gradient(ellipse 70% 58% at 84% 94%,rgba(96,72,36,.16),transparent 66%),
     url(letter-paper.jpg) center center/cover no-repeat,
     linear-gradient(162deg,#efe4c8 0%,#e6d9bd 44%,#d7c7a3 100%);
   box-shadow:0 20px 56px rgba(0,0,0,.84),inset 0 0 56px rgba(104,78,40,.26),inset 0 0 0 1px rgba(110,84,44,.40)}
-/* 紙の繊維（画像を足さず、#grain と同じ手口で） */
-#menu .box.letter::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;opacity:.10;mix-blend-mode:multiply;
+/* 紙の繊維（生成画像に繊維があるので薄く） */
+#menu .box.letter::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;opacity:.06;mix-blend-mode:multiply;
   background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='p'><feTurbulence type='fractalNoise' baseFrequency='.72' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .42 0 0 0 0 .33 0 0 0 0 .18 0 0 0 .55 0'/></filter><rect width='180' height='180' filter='url(%23p)'/></svg>")}
-/* 異世界の叡智のマーク（透かし・中央に大きく） */
+/* 異世界の叡智のマーク（透かし・中央に小さくごく薄く・2026-09-17 v3 KEI「今の3割の大きさでもっと薄く」） */
 #menu .box.letter::after{content:"";position:absolute;left:50%;top:53%;transform:translate(-50%,-50%);
-  width:min(74%,300px);aspect-ratio:520/647;z-index:0;pointer-events:none;
-  background:url(letter-mark.png) center/contain no-repeat;opacity:.14;mix-blend-mode:multiply}
+  width:min(23%,92px);aspect-ratio:520/647;z-index:0;pointer-events:none;
+  background:url(letter-mark.png) center/contain no-repeat;opacity:.07;mix-blend-mode:multiply}
 #menu .box.letter>*{position:relative;z-index:1}
 #menu .lhead{flex:none;padding:22px 24px 0}
 #menu .box.letter h2{font-family:var(--serif);font-size:clamp(15px,4.2vmin,18px);letter-spacing:.42em;text-indent:.42em;
@@ -146,13 +146,12 @@ html,body{margin:0;overflow:hidden;overscroll-behavior:none;font-family:var(--se
 #menu .lbody{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;
   padding:16px 24px 8px}
 #menu .lbody::-webkit-scrollbar{display:none}
-/* 本文。行送り 2.1em ＝ 罫線のピッチ（便箋のように文字の下へ薄い線を敷く） */
-#menu .box.letter .tab p{color:#34271a;font-family:var(--serif);font-size:clamp(14.5px,4.1vmin,17px);line-height:2.1;letter-spacing:.05em;
-  margin:0 0 1.5em;white-space:normal;word-break:normal;min-height:0;
-  background-image:repeating-linear-gradient(to bottom,
-    rgba(104,80,44,0) 0,rgba(104,80,44,0) calc(2.1em - 1px),
-    rgba(104,80,44,.22) calc(2.1em - 1px),rgba(104,80,44,.22) 2.1em);background-position:0 3px}
-#menu .box.letter .tab p.h{background-image:none;color:#5a4324;letter-spacing:.34em;text-indent:.34em;text-align:center;
+/* 本文。罫線は 2026-09-17 v3 で撤去（KEI）。読みやすさ優先で文字を濃く */
+#menu .box.letter .tab p{color:#241a0e;font-family:var(--serif);font-size:clamp(14.5px,4.1vmin,17px);line-height:2.1;letter-spacing:.05em;
+  margin:0 0 1.5em;white-space:normal;word-break:normal;min-height:0}
+/* UIボタン名【…】は途中で折り返さない */
+#menu .box.letter .tab .k{white-space:nowrap}
+#menu .box.letter .tab p.h{color:#4a3418;letter-spacing:.34em;text-indent:.34em;text-align:center;
   font-size:clamp(13.5px,3.8vmin,15.5px);margin:2px 0 1.5em}
 #menu .box.letter .tab p.last{margin-bottom:.8em}
 #menu .lnav{flex:none;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 22px 4px;
