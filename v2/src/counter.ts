@@ -1,11 +1,10 @@
 // ============================================================
 // 簡易アクセスカウンター（2026-09-17 KEI）
+//   2026-09-17 簡略化: リンクは1本にしたので、流入元の振り分け（tiktok/instagram/other）は廃止。
+//   数えるのは「何人来たか」= 鍵 `visits` の1本だけ。?from=... が付いていても無視する。
 //   - 登録不要・無料の Abacus（abacus.jasoncameron.dev・旧 CountAPI の後継）を fetch で1回叩くだけ。
-//     ※ counterapi.dev は v1 が 410 で廃止・v2 は workspace 登録が要るため不採用（2026-09-17 実測）。
 //     ※ /hit/{名前空間}/{鍵} が「無ければ作って +1」。/get/{名前空間}/{鍵} は数えずに現在値だけ返す。
 //     CDN もスクリプトも足さない（fetch だけ）。
-//   - 流入元を tiktok / instagram / other の3本に分けて数える。
-//       ?from=tiktok / ?from=instagram が最優先。無ければ document.referrer で判定。
 //   - 同じタブの連続リロードで水増ししないよう sessionStorage で1タブ1回だけ。
 //     （localStorage の既存キー bookexp-* には一切触らない）
 //   - 通信はすべて try/catch ＋ 3秒でタイムアウト。落ちても本の動作には一切影響しない。
@@ -14,23 +13,9 @@
 const BASE = 'https://abacus.jasoncameron.dev';
 // 本番（github.io）と手元の検証で名前空間を分ける。ローカルで試しても本番の数字は動かない
 const NS = /github\.io$/i.test(location.hostname) ? 'kei-meigen-book' : 'kei-meigen-book-test';
-const KEYS = { tiktok: 'tiktok', instagram: 'instagram', other: 'other' } as const;
-type Src = keyof typeof KEYS;
+const KEY = 'visits';                            // 2026-09-17: 1本だけ（旧 tiktok/instagram/other は廃止）
 const SESSION_KEY = 'bookexp-hit-counted';      // sessionStorage 専用（localStorage とは別世界）
 const TIMEOUT = 3000;
-
-/** どこから来たか。?from= が最優先、次に referrer、どちらも無ければ other */
-export function visitSource(): Src {
-  try {
-    const q = (new URLSearchParams(location.search).get('from') || '').toLowerCase();
-    if (q.includes('tiktok')) return 'tiktok';
-    if (q.includes('insta')) return 'instagram';
-    const r = (document.referrer || '').toLowerCase();
-    if (r.includes('tiktok')) return 'tiktok';
-    if (r.includes('instagram') || r.includes('cdninstagram')) return 'instagram';
-  } catch { /* noop */ }
-  return 'other';
-}
 
 async function hit(url: string): Promise<number | null> {
   try {
@@ -46,36 +31,34 @@ async function hit(url: string): Promise<number | null> {
 }
 
 /** 1タブ1回だけ +1。戻り値は使わない（失敗しても黙って終わる） */
-async function bumpOnce(src: Src): Promise<void> {
+async function bumpOnce(): Promise<void> {
   try {
     if (sessionStorage.getItem(SESSION_KEY)) return;
     sessionStorage.setItem(SESSION_KEY, '1');
   } catch { /* プライベートブラウズ等。数えるだけ数えて終わる */ }
-  await hit(`${BASE}/hit/${NS}/${KEYS[src]}`);
+  await hit(`${BASE}/hit/${NS}/${KEY}`);
 }
 
-/** ?stats の時だけ、3本の現在値を読んで画面の下に小さく出す */
+/** ?stats の時だけ、今の訪問数を読んで画面の下に小さく出す */
 async function showStats(): Promise<void> {
   const el = document.createElement('div');
   el.id = 'hits';
   el.textContent = '訪問を数えている…';
   document.body.appendChild(el);
   el.classList.add('show');
-  const [tt, ig, ot] = await Promise.all([
-    hit(`${BASE}/get/${NS}/${KEYS.tiktok}`),
-    hit(`${BASE}/get/${NS}/${KEYS.instagram}`),
-    hit(`${BASE}/get/${NS}/${KEYS.other}`),
-  ]);
-  if (tt === null && ig === null && ot === null) { el.textContent = '訪問の記録が読めない'; return; }
-  const a = tt || 0, b = ig || 0, c = ot || 0;
-  el.textContent = `TikTok ${a}回／Instagram ${b}回／その他 ${c}回／合計 ${a + b + c}回`;
+  let n = await hit(`${BASE}/get/${NS}/${KEY}`);
+  if (n === null) {                                  // まだ鍵が作られていない＝訪問0。作ってから読み直す
+    await hit(`${BASE}/create/${NS}/${KEY}`);
+    n = await hit(`${BASE}/get/${NS}/${KEY}`);
+  }
+  el.textContent = n === null ? '訪問の記録が読めない' : `これまでの訪問 ${n}回`;
 }
 
 /** 読み込み時に1回だけ呼ぶ。中で全部握りつぶすので await も try も要らない */
 export function initCounter(): void {
   try {
-    // ?stats はKEIが数字を見に来る画面。ここで数えると自分の確認で「その他」が増えるので数えない
+    // ?stats はKEIが数字を見に来る画面。ここで数えると自分の確認で数字が増えるので数えない
     if (new URLSearchParams(location.search).has('stats')) { void showStats(); return; }
-    void bumpOnce(visitSource());
+    void bumpOnce();
   } catch { /* noop */ }
 }

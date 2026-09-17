@@ -49,7 +49,7 @@ setReadingProbe(() => stage === 'read');
 
 // ============================================================ この端末の記録
 ST.visits++; ST.lastVisit = Date.now(); saveStats();
-initCounter();          // 流入元別のアクセス数（外部API・失敗しても何も起きない）
+initCounter();          // 訪問数（合計1本・外部API・失敗しても何も起きない）
 let pagesSession = 0, flipTimes: number[] = [], rushSeen = false;
 
 // ============================================================ 字幕（本の声）
