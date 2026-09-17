@@ -37,6 +37,8 @@ html,body{margin:0;overflow:hidden;overscroll-behavior:none;font-family:var(--se
 #hint{position:fixed;left:50%;top:44%;top:44dvh;transform:translate(-50%,-50%);display:flex;flex-direction:column-reverse;z-index:9;pointer-events:none;text-align:center;
   opacity:0;transition:opacity 1.6s ease}
 #hint.show{opacity:1}
+/* 本を開く時だけ、すっと消す（2026-09-17 KEI: 消えたあと1秒の間をおいて「名言の書」が出る） */
+#hint.bye{transition:opacity .6s ease}
 #hint .rule{width:min(46vw,260px);height:1px;margin:14px auto 0;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
 #hint .txt{font-family:var(--serif);font-size:clamp(14px,4vmin,19px);letter-spacing:.26em;text-indent:.26em;font-weight:400;color:var(--gold2);
   white-space:nowrap;text-shadow:0 1px 2px #000,0 0 12px rgba(0,0,0,.8)}
@@ -110,9 +112,47 @@ html,body{margin:0;overflow:hidden;overscroll-behavior:none;font-family:var(--se
 .dots i{width:6px;height:6px;border:1px solid var(--gold);transform:rotate(45deg);opacity:.45}
 .dots i.on{background:var(--gold);opacity:1}
 #menuActs{margin-top:12px}
-/* 名言の書パネル（2026-09-09 再設計: 幅と余白を広げ、本文をゆったり） */
-#menu .box{width:min(calc(100vw - 32px),380px);padding:12px 16px 14px;max-height:84vh;max-height:84dvh}
-#menu .box.frame{border-width:20px;border-image-width:20px}
+/* ============================================================
+   「この本について」= 羊皮紙の手紙（2026-09-17 KEI: 黒革のページはおかしい）
+   異世界の叡智の紙色（--paper）を地に、縦スクロール＋3ページ送り。
+   ============================================================ */
+#menu .box.letter{
+  position:relative;width:min(calc(100vw - 26px),440px);max-height:88vh;max-height:88dvh;
+  padding:0;overflow:hidden;display:flex;flex-direction:column;
+  color:#3b2c18;border-radius:2px;
+  background:
+    radial-gradient(ellipse 72% 54% at 20% 14%,rgba(255,250,233,.62),transparent 62%),
+    radial-gradient(ellipse 62% 52% at 84% 88%,rgba(122,94,50,.22),transparent 64%),
+    linear-gradient(162deg,#efe4c8 0%,#e6d9bd 44%,#d7c7a3 100%);
+  box-shadow:0 18px 50px rgba(0,0,0,.82),inset 0 0 46px rgba(126,96,50,.30),inset 0 0 0 1px rgba(120,92,50,.34)}
+/* 紙の繊維（画像を足さず、#grain と同じ手口で） */
+#menu .box.letter::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;opacity:.14;mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='p'><feTurbulence type='fractalNoise' baseFrequency='.72' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .42 0 0 0 0 .33 0 0 0 0 .18 0 0 0 .55 0'/></filter><rect width='180' height='180' filter='url(%23p)'/></svg>")}
+#menu .box.letter>*{position:relative;z-index:1}
+#menu .lhead{flex:none;padding:20px 22px 0}
+#menu .box.letter h2{font-family:var(--serif);font-size:clamp(15px,4.2vmin,18px);letter-spacing:.42em;text-indent:.42em;
+  margin:0;font-weight:500;text-align:center;color:#4a3720}
+#menu .lrule{width:min(52%,180px);height:1px;margin:12px auto 4px;background:linear-gradient(90deg,transparent,rgba(94,70,36,.55),transparent)}
+#menu .lbody{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;
+  padding:14px 22px 6px}
+#menu .lbody::-webkit-scrollbar{display:none}
+#menu .box.letter .tab p{color:#3b2c18;font-family:var(--serif);font-size:clamp(14px,3.9vmin,16px);line-height:2.05;letter-spacing:.045em;
+  margin:0 0 1.35em;white-space:normal;word-break:normal;min-height:0}
+#menu .box.letter .tab p.h{color:#5a4324;letter-spacing:.34em;text-indent:.34em;text-align:center;font-size:clamp(13px,3.6vmin,15px);margin:2px 0 1.4em}
+#menu .box.letter .tab p.last{margin-bottom:.6em}
+#menu .lnav{flex:none;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 20px 4px}
+#menu .lbtn{font-family:var(--serif);font-size:clamp(12px,3.4vmin,14px);letter-spacing:.1em;color:#4a3720;background:none;
+  border:1px solid rgba(94,70,36,.45);padding:8px 12px;cursor:pointer;border-radius:1px}
+#menu .lbtn:active{color:#2a1f10;border-color:rgba(94,70,36,.85);background:rgba(94,70,36,.10)}
+#menu .lnum{font-family:var(--ui);font-size:clamp(11px,3vmin,12px);letter-spacing:.12em;color:#6b5330}
+#menu .lclose{flex:none;display:block;margin:6px auto 16px;background:none;border:1px solid rgba(94,70,36,.5);color:#4a3720;
+  padding:9px 30px;letter-spacing:.3em;text-indent:.3em;font-family:var(--serif);font-size:clamp(12px,3.4vmin,14px);cursor:pointer;border-radius:1px}
+#menu .lclose:active{color:#2a1f10;background:rgba(94,70,36,.10)}
+/* ?stats の時だけ出す訪問回数（ふだんは出ない・2026-09-17） */
+#hits{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 4px);z-index:7;text-align:center;pointer-events:none;
+  font-family:var(--ui);font-size:clamp(10px,2.8vmin,12px);letter-spacing:.14em;color:var(--paper2);opacity:0;transition:opacity 1.2s ease;
+  text-shadow:0 1px 3px #000}
+#hits.show{opacity:.72}
 
 /* ---- 開く演出 ---- */
 #readTitle{position:fixed;left:0;right:0;top:36%;text-align:center;pointer-events:none;z-index:21;font-family:var(--serif);color:var(--gold2);

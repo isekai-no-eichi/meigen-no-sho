@@ -3,11 +3,11 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 // 名言の書 v2
 //  - ソース: v2/  → ビルド出力: ../app2/（コミットして GitHub Pages で公開）
-//  - 公開URL: https://kei9999jpn.github.io/page-flip-proto/app2/
+//  - 公開URL: https://kei9999jpn.github.io/meigen-no-sho/app2/（2026-09-17 リポジトリ名変更・旧 page-flip-proto）
 //  - three.js は npm から自ホスト（CDN依存ゼロ）
 //  - 名言画像や glb は リポジトリ直下 assets/ をそのまま参照する（バンドルしない）
 export default defineConfig({
-  base: '/page-flip-proto/app2/',
+  base: '/meigen-no-sho/app2/',
   build: {
     outDir: '../app2',
     emptyOutDir: true,

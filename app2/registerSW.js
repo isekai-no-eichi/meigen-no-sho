@@ -1,1 +1,1 @@
-if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/page-flip-proto/app2/sw.js', { scope: '/page-flip-proto/app2/' })})}
+if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/meigen-no-sho/app2/sw.js', { scope: '/meigen-no-sho/app2/' })})}

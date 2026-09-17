@@ -16,6 +16,7 @@ import {
   thudHeavy, openBookSound, blip, haptic, audioDebug,
 } from './audio';
 import { track } from './track';
+import { initCounter } from './counter';
 import { fsEnter, fsOn } from './fullscreen';
 
 type Stage = 'book' | 'opening' | 'read' | 'closing';
@@ -48,6 +49,7 @@ setReadingProbe(() => stage === 'read');
 
 // ============================================================ この端末の記録
 ST.visits++; ST.lastVisit = Date.now(); saveStats();
+initCounter();          // 流入元別のアクセス数（外部API・失敗しても何も起きない）
 let pagesSession = 0, flipTimes: number[] = [], rushSeen = false;
 
 // ============================================================ 字幕（本の声）
@@ -116,6 +118,8 @@ const ui = new Ui({
   onOpen: (mode, title) => beginRead(mode, title),
   onToggleSound: () => toggleSound(),
   onSay: line => say(line, 2500),
+  // 「しおりを外す」（2026-09-17 KEI）。3Dの本から紐を消し、次は栞なし＝シャッフルで開く
+  onClearBookmark: () => { scene.refreshRibbon(); },
 });
 onSoundChange(on => { ui.paintSound(on); reader.paintSound(on); });
 
@@ -144,6 +148,11 @@ const T_SOUND = 0.85 * OK, T_MOTES = 1.00 * OK, T_DIVE = 1.45 * OK, T_CUT = 2.42
 const T_SFX = T_SOUND + OPEN_DUR - 1.30;   // 革の着地音(呼び出し+1.30s)が表紙の着地と合う時刻
 let openT0 = 0, lifting = false;
 
+// 2026-09-17 KEI の起動演出:
+//   「2回タップで、本を読む」→ タップで文字がフェードで消える（0.6秒）
+//   → 約1秒の間（何も出ない）→「名言の書」がフェードで現れる → 本の中へ吸い込まれる
+const PRELUDE = 1.55;                 // 文字が消える 0.6 ＋ 間 0.95
+
 function beginRead(mode: string, title?: string): void {
   if (stage !== 'book') return;
   // 2026-09-09 KEI: 開くたびに自動で全画面。ダブルタップ／「しおりから読む」「お気に入りを読む」／
@@ -151,16 +160,22 @@ function beginRead(mode: string, title?: string): void {
   // **await や setTimeout より前**に呼ばないとブラウザに断られる。
   fsEnter();
   fsRetry = false;
-  const rt = $('readTitle');
-  rt.querySelector('.main')!.textContent = title || '名言の書';
-  rt.classList.add('show');
-  setTimeout(() => rt.classList.remove('show'), 2400);
   setStage('opening');
-  ui.setLocked(true);
+  ui.setLocked(true);                 // ここで一文と入口ボタンがフェードで消える
   ensureAudio();
   talk.classList.remove('show');
   activity(); pagesSession = 0; flipTimes = []; rushSeen = false;
   track('open_book', { mode });
+  // 文字が消え、1秒ほど何もない「間」をおいてから、題名と開く演出を始める
+  setTimeout(() => startOpening(mode, title), PRELUDE * 1000);
+}
+
+function startOpening(mode: string, title?: string): void {
+  if (stage !== 'opening') return;
+  const rt = $('readTitle');
+  rt.querySelector('.main')!.textContent = title || '名言の書';
+  rt.classList.add('show');
+  setTimeout(() => rt.classList.remove('show'), 2800);
 
   openT0 = performance.now(); lifting = true;
   setAmbBoost(0.34);                                        // 環境音がすっと引く

@@ -1,24 +1,25 @@
 // ============================================================
-// 本の画面のUI（KEI指示 2026-09-07 夜・前の形に戻す）
-//   - 下は縦1列（2026-09-10 KEI）: 上から「しおりから読む」「お気に入りを読む」「この本の説明」。
-//     3つとも同じ幅 min(78vw,320px)・同じ高さ 48px・間隔 10px。栞／印が無い行は隠し、列は中央・下端そろえのまま
-//     2026-09-09 KEI: 本の画面に音のボタンは置かない。音の入切は読書画面の「音」ボタン
-//     2026-09-09 KEI: 全画面の札も置かない。本を開く操作そのものの中で勝手に全画面へ入る（main.ts）
-//     「この本を読む」ボタンは置かない（2回タップで開く）。2026-09-09 KEI: 小さな「栞」「印」の札は意味が分からないので廃止
-//   - 表示から5秒後、画面中央に細い金の罫線1本と一文「2回タップで、本を読む」
+// 本の画面のUI
+//   下は縦1列（2026-09-17 KEI）: 上から
+//     「この本の説明」  … 常時表示
+//     「しおりから読む」「しおりを外す」 … しおりが1本でもある時だけ
+//     「お気に入りを読む」            … お気に入りが1枚でもある時だけ
+//   （2026-09-13 の「常時表示＋一言」は撤回。KEI: 入れた瞬間にボタンが増える形へ）
+//   - 表示から2秒後、画面中央に細い金の罫線1本と一文「2回タップで、本を読む」
 //   - 本を開くのはダブルタップ（400ms以内の2回）だけ。1回タップは何もしない。PC は Enter / Space でも開く
-//   - 「この本の説明」= 画面中央の縦パネル（この本の説明／操作説明／お気に入りの使い方／栞の使い方の4ページ。1文=1行）
-//   - しおりから読む = 一番あとに挟んだ栞のページから／お気に入りを読む = お気に入りのページだけを綴じた本を開く
+//   - 「この本の説明」= 羊皮紙の手紙（2026-09-17 KEI・黒革をやめた）。縦スクロール＋3ページ送り
 // ============================================================
-import { hasBookmark, favCount, a2hsSeen, a2hsMark } from '../state';
+import { hasBookmark, favCount, clearBookmark, a2hsSeen, a2hsMark } from '../state';
 
 const HINT_DELAY = 2000;
 const DOUBLE_TAP = 400;   // 2026-09-09 KEI: 2回タップの猶予を広げる
+const LETTER_PAGES = 3;
 
 export interface UiHooks {
   onOpen: (mode: string, title?: string) => void;
   onToggleSound: () => void;
   onSay: (line: string) => void;
+  onClearBookmark: () => void;
 }
 
 export class Ui {
@@ -27,7 +28,9 @@ export class Ui {
   private menu: HTMLDivElement;
   private a2hs: HTMLDivElement;
   private bResume!: HTMLButtonElement;
+  private bClearBm!: HTMLButtonElement;
   private bFav!: HTMLButtonElement;
+  private letterBody!: HTMLElement;
   private hintTimer: ReturnType<typeof setTimeout> | null = null;
   private tabIdx = 0;
   private lastTap = 0;
@@ -38,46 +41,57 @@ export class Ui {
     wrap.innerHTML = `
 <div id="hint"><div class="rule"></div><div class="txt">2回タップで、本を読む</div></div>
 <div id="ui">
-  <button class="seal wide" id="bResume" aria-label="しおりから読む" hidden>しおりから読む</button>
-  <button class="seal wide" id="bFav" aria-label="お気に入りを読む" hidden>お気に入りを読む</button>
   <button class="seal wide" id="bInfo">この本の説明</button>
+  <button class="seal wide" id="bResume" aria-label="しおりから読む" hidden>しおりから読む</button>
+  <button class="seal wide" id="bClearBm" aria-label="しおりを外す" hidden>しおりを外す</button>
+  <button class="seal wide" id="bFav" aria-label="お気に入りを読む" hidden>お気に入りを読む</button>
 </div>
 <div id="a2hs"><span>ホーム画面に追加すると、枠のない全画面で読める</span><button id="a2hsX" aria-label="閉じる">✕</button></div>
-<div class="ov" id="menu"><div class="box frame">
-  <h2>名言の書</h2>
-  <div class="rule"></div>
-  <p class="h" id="tabTitle">この本について</p>
-  <div class="tabbody">
+<div class="ov" id="menu"><div class="box letter">
+  <div class="lhead">
+    <h2>この本について</h2>
+    <div class="lrule"></div>
+  </div>
+  <div class="lbody" id="letterBody">
   <div class="tab" data-tab="0">
-    <p>この本には、異なる世界を生きた者たちの言葉が収められている。迷いの中で選んだ道、守ろうとしたもの、手放したもの。その記録を、一枚ずつ読むための本だ。</p>
-    <p>栞がなければ、開くたびに言葉の並びが変わる。はじめから順に読む必要はない。今の自分に届く一文があれば、そこで止まればいい。</p>
-    <p>残したい言葉はお気に入りにする。続きは栞に預ける。集められた言葉は、これからも少しずつ、この本に加わっていく。</p>
+    <p>この本は、魔法の書だ。</p>
+    <p>異世界の叡智がこれまでに集めてきた言葉が、一枚残らず挟まっている。</p>
+    <p>魔法の書だから、開くたびに中身が変わる。同じ並びで開くことは二度とない。</p>
+    <p>噂では、この本はいまも厚みを増しているらしい。言葉が見つかるたびに、新しい一枚が静かに綴じられていく。</p>
+    <p>死のうとしていた人がいた。生きる希望を失った人がいた。恋に破れた人、行き先を見失った人、迷ったまま動けなくなった人もいた。</p>
+    <p>その人たちがこの本を開き、一枚の言葉に出会い、考えが変わった。この本に救われた人は、たくさんいる。</p>
+    <p>だから、いまのあなたに合う言葉も、必ずこの中にある。</p>
+    <p class="last">一枚でいい。あなたは必ず、その一枚に出会うことができる。</p>
   </div>
   <div class="tab" data-tab="1" hidden>
-    <p>本を2回タップすると、開く。</p>
-    <p>左右になぞると、ページがめくれる。</p>
-    <p>読んでいる間、ボタンは姿を消す。</p>
-    <p>画面の下に触れると、戻ってくる。</p>
+    <p class="h">しおり</p>
+    <p>読んでいる途中のページを、そのまま取っておける。</p>
+    <p>読書中の画面の下にある「栞」を押すと、いま開いているページにしおりが挟まる。本はそのまま読み続けられる。</p>
+    <p>しおりを挟むと、この最初の画面に「しおりから読む」が出る。次に来た時にそれを押せば、挟んだページから始まる。</p>
+    <p>しおりは何枚でも挟める。同じページでもう一度「栞」を押せば、その一枚だけが外れる。</p>
+    <p class="last">もう続きを追わなくていいと思ったら、「しおりを外す」を押す。しおりは全部なくなり、次からはまた、開くたびに中身が変わる本に戻る。</p>
   </div>
   <div class="tab" data-tab="2" hidden>
-    <p>気に入った言の葉に「お気に入り」を押すと、ページの角に金の印がつく。</p>
-    <p>お気に入りにした言の葉だけを、あとで一冊にして読める。</p>
-    <p>もう一度押せば、お気に入りは外れる。</p>
-  </div>
-  <div class="tab" data-tab="3" hidden>
-    <p>「栞」を押すと、そのページに栞が挟まる。本はそのまま読み続けられる。</p>
-    <p>次に開くとき、本は最後に挟んだ栞のページから始まる。</p>
-    <p>栞は何本でも挟める。</p>
-    <p>栞のあるページでもう一度押せば、その栞だけが外れる。</p>
+    <p class="h">お気に入り</p>
+    <p>心に残った言葉は、手元に残しておける。</p>
+    <p>読書中の画面の下にある「お気に入り」を押すと、そのページの角に金の印がつく。</p>
+    <p>一枚でも印をつけると、この最初の画面に「お気に入りを読む」が出る。押せば、印をつけた言葉だけを綴じ直した本が開く。</p>
+    <p>同じページでもう一度押せば、印は消える。</p>
+    <p class="last">この本は開くたびに中身が変わる。もう一度会いたい言葉があれば、その場で印をつけておくといい。</p>
   </div>
   </div>
-  <div class="pnav"><button class="tarrow" id="tabPrev">‹</button><div class="dots"><i class="on"></i><i></i><i></i><i></i></div><button class="tarrow" id="tabNext">›</button></div>
-  <button class="close" id="menuClose">閉じる</button>
+  <div class="lnav">
+    <button class="lbtn" id="tabPrev">前のページ</button>
+    <span class="lnum" id="tabNum">1 / ${LETTER_PAGES}</span>
+    <button class="lbtn" id="tabNext">次のページ</button>
+  </div>
+  <button class="lclose" id="menuClose">本にもどる</button>
 </div></div>`;
     while (wrap.firstElementChild) document.body.appendChild(wrap.firstElementChild);
 
     const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
     this.hint = $('hint'); this.ui = $('ui'); this.menu = $('menu'); this.a2hs = $('a2hs');
+    this.letterBody = $('letterBody');
 
     const stop = (e: Event) => e.stopPropagation();
     this.ui.addEventListener('pointerdown', stop);
@@ -88,16 +102,25 @@ export class Ui {
     $('tabPrev').addEventListener('click', () => this.showTab(this.tabIdx - 1));
     $('tabNext').addEventListener('click', () => this.showTab(this.tabIdx + 1));
     this.bResume = $<HTMLButtonElement>('bResume');
+    this.bClearBm = $<HTMLButtonElement>('bClearBm');
     this.bFav = $<HTMLButtonElement>('bFav');
     this.bResume.addEventListener('click', () => {
       if (this.locked) return;
       if (hasBookmark()) this.hooks.onOpen('resume');
-      else this.hooks.onSay('しおりは、まだ挟まれていません');
+      else { this.updateEntry(); this.hooks.onSay('しおりは、まだ挟まれていません'); }
+    });
+    // しおりを外す＝しおりを全部消す。次に開く時はまたシャッフル（Reader.open が栞なしで混ぜ直す）
+    this.bClearBm.addEventListener('click', () => {
+      if (this.locked) return;
+      clearBookmark();
+      this.updateEntry();
+      this.hooks.onClearBookmark();
+      this.hooks.onSay('しおりを外した。次からはまた、開くたびに変わる');
     });
     this.bFav.addEventListener('click', () => {
       if (this.locked) return;
       if (favCount() > 0) this.hooks.onOpen('fav', 'お気に入りのページ');
-      else this.hooks.onSay('お気に入りは、まだ登録されていません');
+      else { this.updateEntry(); this.hooks.onSay('お気に入りは、まだ登録されていません'); }
     });
     this.updateEntry();
     $('a2hsX').addEventListener('click', () => this.closeA2hs());
@@ -114,26 +137,36 @@ export class Ui {
   }
 
   /**
-   * 入口ボタンは常に出す（2026-09-13 KEI・他者フィードバック）。
-   * 中身が無い時は押すと「まだ挟まれていません／まだ登録されていません」の一言。
-   * （2026-09-09の「中身がある時だけ出す」は撤回）
+   * 入口ボタンの出し入れ（2026-09-17 KEI）。
+   *   「この本の説明」は常時。
+   *   「しおりから読む」「しおりを外す」はしおりが1本でもある時だけ。
+   *   「お気に入りを読む」はお気に入りが1枚でもある時だけ。
    */
   updateEntry(): void {
-    this.bResume.hidden = false;
-    this.bFav.hidden = false;
+    const bm = hasBookmark();
+    this.bResume.hidden = !bm;
+    this.bClearBm.hidden = !bm;
+    this.bFav.hidden = favCount() === 0;
   }
 
-  /** 本が現れたら呼ぶ。UIを出し、5秒後に一文が浮かぶ */
+  /** 本が現れたら呼ぶ。UIを出し、しばらくして一文が浮かぶ */
   start(): void {
     this.updateEntry();
     this.showUi();
+    this.hint.classList.remove('bye');
     if (this.hintTimer) clearTimeout(this.hintTimer);
     this.hintTimer = setTimeout(() => { if (!this.locked) this.hint.classList.add('show'); }, HINT_DELAY);
     setTimeout(() => this.maybeA2hs(), 1400);
   }
   setLocked(v: boolean): void {
     this.locked = v;
-    if (v) { this.hint.classList.remove('show'); this.hideUi(); this.closeMenu(); this.closeA2hs(); }
+    if (v) { this.fadeHint(); this.hideUi(); this.closeMenu(); this.closeA2hs(); }
+  }
+
+  /** 開く時だけ、一文をすっと（0.6秒で）消す。ふだんの消え方は 1.6 秒のまま */
+  fadeHint(): void {
+    this.hint.classList.add('bye');
+    this.hint.classList.remove('show');
   }
 
   /**
@@ -145,7 +178,7 @@ export class Ui {
     const now = performance.now();
     if (now - this.lastTap < DOUBLE_TAP) {
       this.lastTap = 0;
-      this.hint.classList.remove('show');
+      this.fadeHint();
       this.hooks.onOpen('read');
       return;
     }
@@ -164,10 +197,10 @@ export class Ui {
   closeMenu(): void { this.menu.classList.remove('show'); }
 
   private showTab(n: number): void {
-    this.tabIdx = (n + 4) % 4;
+    this.tabIdx = (n + LETTER_PAGES) % LETTER_PAGES;
     document.querySelectorAll<HTMLElement>('#menu .tab').forEach(el => { el.hidden = +(el.dataset.tab || '0') !== this.tabIdx; });
-    document.querySelectorAll<HTMLElement>('#menu .dots i').forEach((el, k) => el.classList.toggle('on', k === this.tabIdx));
-    (document.getElementById('tabTitle') as HTMLElement).textContent = ['この本について', '読み方', 'お気に入り', '栞'][this.tabIdx];
+    (document.getElementById('tabNum') as HTMLElement).textContent = (this.tabIdx + 1) + ' / ' + LETTER_PAGES;
+    this.letterBody.scrollTop = 0;                 // ページを送ったら手紙の頭から
   }
 
   /** 本の画面に音のボタンは置かない（2026-09-09 KEI）。音の入切は読書画面の「音」ボタンで行う */

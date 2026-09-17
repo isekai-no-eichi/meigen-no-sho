@@ -119,13 +119,13 @@ export function a2hsSeen(): boolean { try { return !!localStorage.getItem(K.a2hs
 export function a2hsMark(): void { try { localStorage.setItem(K.a2hs, '1'); } catch { /* noop */ } }
 
 // ---- 共通 ----
-/** リポジトリ直下の assets/ を指す。base が /page-flip-proto/app2/ なので ../assets/ で届く */
+/** リポジトリ直下の assets/ を指す。base が /meigen-no-sho/app2/ なので ../assets/ で届く */
 export function asset(path: string): string {
   return new URL('../assets/' + path, document.baseURI).href;
 }
 export const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || '');
 export const QP = new URLSearchParams(location.search);
-export const BUILD = '20260909v7';
+export const BUILD = '20260917v10';
 
 // 2026-09-09 KEI: BUILD を上げても栞・印・枚数は消さない（更新のたびに読者の記録が飛ぶ不具合）。
 // 記録するのは「どの版まで見たか」だけ。設定の形を変える時だけ、ここに移行処理を足す。
