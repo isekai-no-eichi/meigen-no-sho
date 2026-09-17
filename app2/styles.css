@@ -119,8 +119,12 @@ html,body{margin:0;overflow:hidden;overscroll-behavior:none;font-family:var(--se
    読みやすさ優先で、v3 の大きめの文字と広い行間・余白はそのまま引き継ぐ。
    文章の差し替えは src/ui/Ui.ts の data-tab="0..2" の <p> だけ触ればよい。
    ============================================================ */
+/* v5（2026-09-17 KEI「画面いっぱいに広がらないで。3ページとも同じ形で」）:
+   高さは画面の約68%で固定。3ページとも同じ枠の大きさになり、
+   はみ出した本文は .lbody の中だけが縦に流れる（ボタン列は下辺に固定）。 */
 #menu .box.letter{
-  position:relative;width:min(calc(100vw - 22px),440px);max-height:90vh;max-height:90dvh;
+  position:relative;width:min(calc(100vw - 22px),440px);
+  height:min(68vh,600px);height:min(68dvh,600px);max-height:none;
   padding:0;display:flex;flex-direction:column;
   color:var(--paper);background:none;border-radius:0}
 #menu .box.letter.frame{border-width:22px;border-image-width:22px}
