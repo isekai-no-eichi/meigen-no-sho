@@ -74,7 +74,8 @@ async function showStats(): Promise<void> {
 /** 読み込み時に1回だけ呼ぶ。中で全部握りつぶすので await も try も要らない */
 export function initCounter(): void {
   try {
-    const stats = new URLSearchParams(location.search).has('stats');
-    void bumpOnce(visitSource()).then(() => { if (stats) void showStats(); });
+    // ?stats はKEIが数字を見に来る画面。ここで数えると自分の確認で「その他」が増えるので数えない
+    if (new URLSearchParams(location.search).has('stats')) { void showStats(); return; }
+    void bumpOnce(visitSource());
   } catch { /* noop */ }
 }
