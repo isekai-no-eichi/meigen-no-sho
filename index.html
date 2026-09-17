@@ -3,11 +3,52 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="refresh" content="2; url=./app2/">
 <title>異世界の叡智 — 書斎</title>
-<!-- ?from=tiktok などのクエリを app2/ へ引き継ぐ（2026-09-17 流入元カウンター） -->
-<script>location.replace('./app2/' + location.search + location.hash);</script>
-<style>html,body{margin:0;height:100%;background:#0d0a07;color:#d8cfbc;font-family:serif;display:flex;align-items:center;justify-content:center}a{color:#d8cfbc}</style>
+<!--
+  ふだんは app2/ へ転送する（?from=... 等のクエリはそのまま引き継ぐ）。
+  ?stats が付いている時だけ転送せず、この1枚で訪問数だけを出す（2026-09-18 KEI）。
+  本（3D・音・入口UI）は一切読み込まない＝KEIが数字を見に来ても訪問数は増えない。
+-->
+<script>
+  (function () {
+    var isStats = /(^|[?&])stats(=|&|$)/.test(location.search);
+    if (!isStats) {
+      document.write('<meta http-equiv="refresh" content="2; url=./app2/">');
+      location.replace('./app2/' + location.search + location.hash);
+    }
+  })();
+</script>
+<style>
+  html,body{margin:0;height:100%;background:#000;color:#e6d9bd;
+    font-family:"Hiragino Mincho ProN","Yu Mincho",serif;
+    display:flex;align-items:center;justify-content:center;text-align:center}
+  a{color:#d8cfbc}
+  #stats{font-size:clamp(22px,7vmin,40px);letter-spacing:.08em;line-height:1.6}
+  #stats b{font-size:clamp(40px,14vmin,84px);font-weight:500;letter-spacing:.04em}
+</style>
 </head>
-<body><a href="./app2/">書斎へ</a></body>
+<body>
+<noscript><a href="./app2/">書斎へ</a></noscript>
+<script>
+  (function () {
+    if (!/(^|[?&])stats(=|&|$)/.test(location.search)) return;
+    var el = document.createElement('div');
+    el.id = 'stats'; el.textContent = '…';
+    document.body.appendChild(el);
+    // 数えない読み取り専用の GET（/hit ではなく /get）。3秒で諦める
+    var ac = new AbortController();
+    var to = setTimeout(function () { ac.abort(); }, 3000);
+    fetch('https://abacus.jasoncameron.dev/get/kei-meigen-book/visits',
+          { signal: ac.signal, cache: 'no-store', mode: 'cors' })
+      .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+      .then(function (j) {
+        clearTimeout(to);
+        var n = (j && (j.value != null ? j.value : j.count));
+        if (typeof n !== 'number') throw 0;
+        el.innerHTML = '訪問数 <b>' + n + '</b> 回';
+      })
+      .catch(function () { clearTimeout(to); el.textContent = '取得できませんでした'; });
+  })();
+</script>
+</body>
 </html>

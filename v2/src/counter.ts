@@ -8,7 +8,7 @@
 //   - 同じタブの連続リロードで水増ししないよう sessionStorage で1タブ1回だけ。
 //     （localStorage の既存キー bookexp-* には一切触らない）
 //   - 通信はすべて try/catch ＋ 3秒でタイムアウト。落ちても本の動作には一切影響しない。
-//   - 表示は ?stats の時だけ。ふだんの読者には何も出さない。
+//   - 数字の表示はルートの index.html（?stats）が受け持つ。本の中には何も出さない（2026-09-18 KEI）。
 // ============================================================
 const BASE = 'https://abacus.jasoncameron.dev';
 // 本番（github.io）と手元の検証で名前空間を分ける。ローカルで試しても本番の数字は動かない
@@ -39,26 +39,12 @@ async function bumpOnce(): Promise<void> {
   await hit(`${BASE}/hit/${NS}/${KEY}`);
 }
 
-/** ?stats の時だけ、今の訪問数を読んで画面の下に小さく出す */
-async function showStats(): Promise<void> {
-  const el = document.createElement('div');
-  el.id = 'hits';
-  el.textContent = '訪問を数えている…';
-  document.body.appendChild(el);
-  el.classList.add('show');
-  let n = await hit(`${BASE}/get/${NS}/${KEY}`);
-  if (n === null) {                                  // まだ鍵が作られていない＝訪問0。作ってから読み直す
-    await hit(`${BASE}/create/${NS}/${KEY}`);
-    n = await hit(`${BASE}/get/${NS}/${KEY}`);
-  }
-  el.textContent = n === null ? '訪問の記録が読めない' : `これまでの訪問 ${n}回`;
-}
-
 /** 読み込み時に1回だけ呼ぶ。中で全部握りつぶすので await も try も要らない */
 export function initCounter(): void {
   try {
-    // ?stats はKEIが数字を見に来る画面。ここで数えると自分の確認で数字が増えるので数えない
-    if (new URLSearchParams(location.search).has('stats')) { void showStats(); return; }
+    // ?stats はKEIが数字を見に来る画面。表示はルートの index.html が受け持つ（2026-09-18）。
+    // ここへ直接来た場合も、数えない・何も出さない
+    if (new URLSearchParams(location.search).has('stats')) return;
     void bumpOnce();
   } catch { /* noop */ }
 }
