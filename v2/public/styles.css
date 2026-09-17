@@ -116,38 +116,54 @@ html,body{margin:0;overflow:hidden;overscroll-behavior:none;font-family:var(--se
    「この本について」= 羊皮紙の手紙（2026-09-17 KEI: 黒革のページはおかしい）
    異世界の叡智の紙色（--paper）を地に、縦スクロール＋3ページ送り。
    ============================================================ */
+/* 2026-09-17b 見た目の作り直し（KEI「異世界の叡智っぽい紙になっていない」）
+   紙 = letter-paper.jpg（読書画面のページ裏 assets/backside.jpg から生成・明度+10%/彩度-20%）
+   透かし = letter-mark.png（英語版ロゴ黒からエンブレムだけ切り出し・焦茶・中央に大きく薄く）
+   罫線 = 本文 <p> に repeating-linear-gradient（行送りと同じ 2.1em ピッチ）
+   文章の差し替えは src/ui/Ui.ts の data-tab="0..2" の <p> だけ触ればよい。 */
 #menu .box.letter{
-  position:relative;width:min(calc(100vw - 26px),440px);max-height:88vh;max-height:88dvh;
+  position:relative;width:min(calc(100vw - 22px),460px);max-height:90vh;max-height:90dvh;
   padding:0;overflow:hidden;display:flex;flex-direction:column;
-  color:#3b2c18;border-radius:2px;
+  color:#34271a;border-radius:2px;
   background:
-    radial-gradient(ellipse 72% 54% at 20% 14%,rgba(255,250,233,.62),transparent 62%),
-    radial-gradient(ellipse 62% 52% at 84% 88%,rgba(122,94,50,.22),transparent 64%),
+    radial-gradient(ellipse 78% 58% at 22% 10%,rgba(255,252,240,.40),transparent 66%),
+    radial-gradient(ellipse 70% 58% at 84% 94%,rgba(96,72,36,.26),transparent 66%),
+    url(letter-paper.jpg) center center/cover no-repeat,
     linear-gradient(162deg,#efe4c8 0%,#e6d9bd 44%,#d7c7a3 100%);
-  box-shadow:0 18px 50px rgba(0,0,0,.82),inset 0 0 46px rgba(126,96,50,.30),inset 0 0 0 1px rgba(120,92,50,.34)}
+  box-shadow:0 20px 56px rgba(0,0,0,.84),inset 0 0 56px rgba(104,78,40,.26),inset 0 0 0 1px rgba(110,84,44,.40)}
 /* 紙の繊維（画像を足さず、#grain と同じ手口で） */
-#menu .box.letter::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;opacity:.14;mix-blend-mode:multiply;
+#menu .box.letter::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;opacity:.10;mix-blend-mode:multiply;
   background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='p'><feTurbulence type='fractalNoise' baseFrequency='.72' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .42 0 0 0 0 .33 0 0 0 0 .18 0 0 0 .55 0'/></filter><rect width='180' height='180' filter='url(%23p)'/></svg>")}
+/* 異世界の叡智のマーク（透かし・中央に大きく） */
+#menu .box.letter::after{content:"";position:absolute;left:50%;top:53%;transform:translate(-50%,-50%);
+  width:min(74%,300px);aspect-ratio:520/647;z-index:0;pointer-events:none;
+  background:url(letter-mark.png) center/contain no-repeat;opacity:.14;mix-blend-mode:multiply}
 #menu .box.letter>*{position:relative;z-index:1}
-#menu .lhead{flex:none;padding:20px 22px 0}
+#menu .lhead{flex:none;padding:22px 24px 0}
 #menu .box.letter h2{font-family:var(--serif);font-size:clamp(15px,4.2vmin,18px);letter-spacing:.42em;text-indent:.42em;
-  margin:0;font-weight:500;text-align:center;color:#4a3720}
-#menu .lrule{width:min(52%,180px);height:1px;margin:12px auto 4px;background:linear-gradient(90deg,transparent,rgba(94,70,36,.55),transparent)}
+  margin:0;font-weight:500;text-align:center;color:#43321c}
+#menu .lrule{width:min(52%,180px);height:1px;margin:13px auto 4px;background:linear-gradient(90deg,transparent,rgba(78,58,30,.55),transparent)}
 #menu .lbody{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;
-  padding:14px 22px 6px}
+  padding:16px 24px 8px}
 #menu .lbody::-webkit-scrollbar{display:none}
-#menu .box.letter .tab p{color:#3b2c18;font-family:var(--serif);font-size:clamp(14px,3.9vmin,16px);line-height:2.05;letter-spacing:.045em;
-  margin:0 0 1.35em;white-space:normal;word-break:normal;min-height:0}
-#menu .box.letter .tab p.h{color:#5a4324;letter-spacing:.34em;text-indent:.34em;text-align:center;font-size:clamp(13px,3.6vmin,15px);margin:2px 0 1.4em}
-#menu .box.letter .tab p.last{margin-bottom:.6em}
-#menu .lnav{flex:none;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 20px 4px}
-#menu .lbtn{font-family:var(--serif);font-size:clamp(12px,3.4vmin,14px);letter-spacing:.1em;color:#4a3720;background:none;
-  border:1px solid rgba(94,70,36,.45);padding:8px 12px;cursor:pointer;border-radius:1px}
-#menu .lbtn:active{color:#2a1f10;border-color:rgba(94,70,36,.85);background:rgba(94,70,36,.10)}
+/* 本文。行送り 2.1em ＝ 罫線のピッチ（便箋のように文字の下へ薄い線を敷く） */
+#menu .box.letter .tab p{color:#34271a;font-family:var(--serif);font-size:clamp(14.5px,4.1vmin,17px);line-height:2.1;letter-spacing:.05em;
+  margin:0 0 1.5em;white-space:normal;word-break:normal;min-height:0;
+  background-image:repeating-linear-gradient(to bottom,
+    rgba(104,80,44,0) 0,rgba(104,80,44,0) calc(2.1em - 1px),
+    rgba(104,80,44,.22) calc(2.1em - 1px),rgba(104,80,44,.22) 2.1em);background-position:0 3px}
+#menu .box.letter .tab p.h{background-image:none;color:#5a4324;letter-spacing:.34em;text-indent:.34em;text-align:center;
+  font-size:clamp(13.5px,3.8vmin,15.5px);margin:2px 0 1.5em}
+#menu .box.letter .tab p.last{margin-bottom:.8em}
+#menu .lnav{flex:none;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 22px 4px;
+  border-top:1px solid rgba(104,80,44,.22)}
+#menu .lbtn{font-family:var(--serif);font-size:clamp(12.5px,3.6vmin,14.5px);letter-spacing:.1em;color:#43321c;background:rgba(255,250,235,.22);
+  border:1px solid rgba(94,70,36,.45);padding:9px 14px;cursor:pointer;border-radius:1px}
+#menu .lbtn:active{color:#2a1f10;border-color:rgba(94,70,36,.85);background:rgba(94,70,36,.12)}
 #menu .lnum{font-family:var(--ui);font-size:clamp(11px,3vmin,12px);letter-spacing:.12em;color:#6b5330}
-#menu .lclose{flex:none;display:block;margin:6px auto 16px;background:none;border:1px solid rgba(94,70,36,.5);color:#4a3720;
-  padding:9px 30px;letter-spacing:.3em;text-indent:.3em;font-family:var(--serif);font-size:clamp(12px,3.4vmin,14px);cursor:pointer;border-radius:1px}
-#menu .lclose:active{color:#2a1f10;background:rgba(94,70,36,.10)}
+#menu .lclose{flex:none;display:block;margin:8px auto 18px;background:rgba(255,250,235,.22);border:1px solid rgba(94,70,36,.5);color:#43321c;
+  padding:10px 32px;letter-spacing:.3em;text-indent:.3em;font-family:var(--serif);font-size:clamp(12.5px,3.6vmin,14.5px);cursor:pointer;border-radius:1px}
+#menu .lclose:active{color:#2a1f10;background:rgba(94,70,36,.12)}
 /* ?stats の時だけ出す訪問回数（ふだんは出ない・2026-09-17） */
 #hits{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 4px);z-index:7;text-align:center;pointer-events:none;
   font-family:var(--ui);font-size:clamp(10px,2.8vmin,12px);letter-spacing:.14em;color:var(--paper2);opacity:0;transition:opacity 1.2s ease;
