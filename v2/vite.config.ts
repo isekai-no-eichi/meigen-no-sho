@@ -37,7 +37,7 @@ export default defineConfig({
           },
           {
             // 本体・音・テクスチャ
-            urlPattern: /\/assets\/(book\.glb|.*\.(jpg|png|webp|mp3|webm))$/,
+            urlPattern: /(\/assets\/(book\.glb|.*\.(jpg|png|webp|mp3|webm))|\/book\.glb|\/draco\/.*)(\?.*)?$/,
             handler: 'CacheFirst',
             options: {
               cacheName: 'shell-assets-v2',
