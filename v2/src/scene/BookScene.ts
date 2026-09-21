@@ -67,6 +67,9 @@ const GradeShader = {
     }`,
 };
 
+/** 出現の時、本が回りながら正面を向く角度（+25°→0） */
+const REVEAL_YAW = 25 * Math.PI / 180;
+
 const RIB_YAW = -0.06;   // 栞タブの向き（本の上端＝奥端から覗く。2026-09-07 夜 KEI「本の上に挟む」）
 
 export class BookScene {
@@ -112,6 +115,16 @@ export class BookScene {
   private mPos: Float32Array; private mVel: Float32Array; private mLife: Float32Array;
   private MN = MOBILE ? 280 : 480;
   private motesOn = false; private moteT = 0;
+
+  // ---- 合言葉のあとの本の出現（2026-09-21 KEI） ----
+  /** 本が消えている間も部屋・ろうそく・塵は描く（合言葉の画面） */
+  keepAmbience = false;
+  private revealT = -1;                         // -1 = 出現演出をしていない
+  private reveal: THREE.Points;
+  private rGeo = new THREE.BufferGeometry();
+  private rPos: Float32Array; private rVel: Float32Array;
+  private RN = MOBILE ? 70 : 110;
+  private revealFX = -1;                        // 光の粒の経過（2秒で消える）
 
   private composer: EffectComposer | null = null;
   private bloomPass: UnrealBloomPass | null = null;
@@ -187,6 +200,16 @@ export class BookScene {
     }));
     this.motes.visible = false;
     this.camera.add(this.motes);
+
+    // 合言葉のあと、本の位置から放射状に散る金の粒（2026-09-21 KEI）
+    this.rPos = new Float32Array(this.RN * 3); this.rVel = new Float32Array(this.RN * 3);
+    this.rGeo.setAttribute('position', new THREE.BufferAttribute(this.rPos, 3));
+    this.reveal = new THREE.Points(this.rGeo, new THREE.PointsMaterial({
+      size: 0.013, map: new THREE.CanvasTexture(c), transparent: true, opacity: 0,
+      depthWrite: false, blending: THREE.AdditiveBlending, color: 0xe6c690,
+    }));
+    this.reveal.visible = false;
+    this.scene.add(this.reveal);
 
     this.buildComposer();
   }
@@ -473,6 +496,53 @@ export class BookScene {
     this.mGeo.attributes.position.needsUpdate = true;
     (this.motes.material as THREE.PointsMaterial).opacity = Math.min(0.45, this.moteT * 1.0);
   }
+  // ---- 合言葉のあとの出現（2026-09-21 KEI） ----
+  /** 本を消しておく（合言葉の画面のあいだ） */
+  hideBook(): void { this.bookScale = 0; this.bookTarget = 0; this.pivot.scale.setScalar(0.0001); }
+  /** 本が現れる。scale 0→1（1.4秒 easeOutCubic）＋ Y軸 +25°→0、同時に金の粒が散る */
+  revealStart(): void {
+    this.revealT = 0; this.bookTarget = 1; this.bookScale = 0;
+    this.revealFX = 0; this.reveal.visible = true;
+    const o = this.pivot.position;
+    for (let i = 0; i < this.RN; i++) {
+      // 本の位置から放射状に。上へ少し流れる
+      const th = Math.random() * Math.PI * 2, ph = Math.acos(2 * Math.random() - 1);
+      const sp = 0.10 + Math.random() * 0.26;
+      this.rPos[i * 3] = o.x + (Math.random() - 0.5) * 0.04;
+      this.rPos[i * 3 + 1] = o.y + (Math.random() - 0.5) * 0.03;
+      this.rPos[i * 3 + 2] = o.z + (Math.random() - 0.5) * 0.04;
+      this.rVel[i * 3] = Math.sin(ph) * Math.cos(th) * sp;
+      this.rVel[i * 3 + 1] = Math.cos(ph) * sp * 0.7 + 0.05;
+      this.rVel[i * 3 + 2] = Math.sin(ph) * Math.sin(th) * sp;
+    }
+    this.rGeo.attributes.position.needsUpdate = true;
+  }
+  /** 出現中か（main.ts のループが自転などを止める判断に使う） */
+  get revealing(): boolean { return this.revealT >= 0; }
+  private revealStep(dt: number): void {
+    if (this.revealT >= 0) {
+      this.revealT += dt;
+      const k = Math.min(this.revealT / 1.4, 1), e = 1 - Math.pow(1 - k, 3);
+      this.bookScale = e;
+      this.pivot.rotation.y = (1 - e) * REVEAL_YAW;
+      if (k >= 1) { this.revealT = -1; this.pivot.rotation.y = 0; this.bookScale = 1; }
+    }
+    if (this.revealFX >= 0) {
+      this.revealFX += dt;
+      const k = Math.min(this.revealFX / 2.0, 1);
+      for (let i = 0; i < this.RN; i++) {
+        const d = Math.exp(-dt / 0.55);                 // すっと減速して漂う
+        this.rVel[i * 3] *= d; this.rVel[i * 3 + 2] *= d; this.rVel[i * 3 + 1] = this.rVel[i * 3 + 1] * d + 0.012 * dt;
+        this.rPos[i * 3] += this.rVel[i * 3] * dt;
+        this.rPos[i * 3 + 1] += this.rVel[i * 3 + 1] * dt;
+        this.rPos[i * 3 + 2] += this.rVel[i * 3 + 2] * dt;
+      }
+      this.rGeo.attributes.position.needsUpdate = true;
+      (this.reveal.material as THREE.PointsMaterial).opacity = 0.85 * Math.min(1, k * 8) * (1 - k) * (1 - k * 0.2);
+      if (k >= 1) { this.revealFX = -1; this.reveal.visible = false; }
+    }
+  }
+
   /** 机に落ちた衝撃で塵が舞う */
   burstDust(): void {
     for (let i = 0; i < this.dspd.length; i++) this.dspd[i] = 0.05 + Math.random() * 0.08;
@@ -544,7 +614,8 @@ export class BookScene {
     if (!book) return;
     const { dt, wdt, t } = opts;
 
-    this.bookScale += (this.bookTarget - this.bookScale) * (1 - Math.exp(-wdt / 0.28));
+    if (this.revealT >= 0 || this.revealFX >= 0) this.revealStep(wdt);
+    else this.bookScale += (this.bookTarget - this.bookScale) * (1 - Math.exp(-wdt / 0.28));
     this.pivot.scale.setScalar(Math.max(0.0001, this.bookScale));
     this.pivot.position.y = 0.10 + Math.sin(t * 0.9) * 0.008;
     if (opts.autoSpin) this.camTheta += dt * 0.055;
@@ -602,7 +673,7 @@ export class BookScene {
     const p = this.dustGeo.attributes.position.array as Float32Array;
     for (let i = 0; i < this.ND; i++) { p[i * 3 + 1] += this.dspd[i] * dt; if (p[i * 3 + 1] > 0.55) p[i * 3 + 1] = -0.55; }
     this.dustGeo.attributes.position.needsUpdate = true;
-    this.dust.visible = this.bookScale > 0.2;
+    this.dust.visible = this.bookScale > 0.2 || this.keepAmbience;   // 合言葉の画面でも塵は舞わせる
 
     if (this.ribbon && this.ribbon.visible) {
       this.ribbon.rotation.y = RIB_YAW + Math.sin(t * 0.7) * 0.03 + this.shake * Math.sin(t * 40) * 0.08;
@@ -662,7 +733,7 @@ export class BookScene {
       cam.lookAt(this.tiltCur.x * 0.02 + hx, this.tiltCur.y * 0.015 + hy, 0);
     }
 
-    if (this.bookScale > 0.002) {
+    if (this.bookScale > 0.002 || this.keepAmbience) {
       if (this.composer) this.composer.render(); else this.renderer.render(this.scene, cam);
     }
     if (this.capture) {

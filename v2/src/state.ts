@@ -14,6 +14,7 @@ export const K = {
   bookmark: 'bookexp-bookmark',
   stats: 'bookexp-stats',
   a2hs: 'bookexp-a2hs',
+  unlocked: 'bookexp-unlocked',
 } as const;
 
 export interface Settings {
@@ -117,6 +118,11 @@ export function saveStats(): void { writeJSON(K.stats, ST); }
 // ---- ホーム画面に追加のヒント ----
 export function a2hsSeen(): boolean { try { return !!localStorage.getItem(K.a2hs); } catch { return true; } }
 export function a2hsMark(): void { try { localStorage.setItem(K.a2hs, '1'); } catch { /* noop */ } }
+
+// ---- 合言葉（初回だけのゲート・2026-09-21 KEI） ----
+/** 一度でも合言葉を通したか。通したあとは今までどおり本が最初から出る */
+export function isUnlocked(): boolean { try { return !!localStorage.getItem(K.unlocked); } catch { return true; } }
+export function markUnlocked(): void { try { localStorage.setItem(K.unlocked, '1'); } catch { /* noop */ } }
 
 // ---- 共通 ----
 /** リポジトリ直下の assets/ を指す。base が /meigen-no-sho/app2/ なので ../assets/ で届く */

@@ -7,8 +7,9 @@ import * as THREE from 'three';
 import { BookScene, FLARE_GAIN } from './scene/BookScene';
 import { Reader } from './reader/Reader';
 import { Ui } from './ui/Ui';
+import { Gate, gateNeeded } from './ui/Gate';
 import {
-  S, ST, saveStats, hasBookmark, favCount, MOBILE, QP,
+  S, ST, saveStats, hasBookmark, favCount, MOBILE, QP, markUnlocked,
 } from './state';
 import {
   initAudioGlobalHooks, ensureAudio, toggleSound, onSoundChange, activity, flipDuck,
@@ -311,9 +312,32 @@ addEventListener('resize', () => scene.resize());
 scene.resize();
 initAudioGlobalHooks();
 
+// 初回だけの合言葉ゲート（2026-09-21 KEI）。
+//   本は出さず（scale 0・塵と灯りはそのまま）、合言葉が合ったら枠が割れて本が現れる。
+//   2回目以降（bookexp-unlocked あり）は今までどおり、いきなり本が出る。
+const GATE = gateNeeded();
+const REVEAL_MS = 1400;               // BookScene.revealStart の出現時間と合わせる
+// 合言葉を出している間と出現中は自転を止める（止めないと、合言葉に手間取った分だけ
+// 本が回った角度で現れ、いつもの入口と見え方がずれる・2026-09-21）
+let gateUp = GATE;
+
 scene.load(() => {
   scene.resize();
-  ui.start();
+  if (!GATE) { ui.start(); return; }
+  scene.hideBook();
+  scene.keepAmbience = true;
+  ui.setLocked(true);                      // 合言葉の間は2回タップで開かない
+  const gate = new Gate(() => {
+    scene.revealStart();
+    setTimeout(() => {
+      scene.keepAmbience = false;          // 本が出そろってから、ふだんの描画条件に戻す
+      gateUp = false;                      // ここから自転も再開
+      markUnlocked();
+      ui.setLocked(false);
+      ui.start();                          // ここから通常運転（2秒後に「2回タップで、本を読む」）
+    }, REVEAL_MS);
+  });
+  gate.show();
 });
 
 scene.renderer.setAnimationLoop(() => {
@@ -348,7 +372,7 @@ scene.renderer.setAnimationLoop(() => {
   scene.update({
     dt, wdt, t, raw,
     dragging, opening, diving, diveT,
-    autoSpin: !dragging && !opening && !diving && stage === 'book',
+    autoSpin: !dragging && !opening && !diving && !gateUp && stage === 'book',
     camOverride: closeCam,
   });
 });
