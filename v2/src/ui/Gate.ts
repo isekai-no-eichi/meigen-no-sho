@@ -17,8 +17,11 @@ const SPLIT_MS = 500;      // 枠が左右に割れて消える
 const ERR_MS = 1500;       // 「合言葉が違います」を出しておく時間
 
 function norm(s: string): string {
-  let v = (s || '').trim();
+  let v = (s || '');
   try { v = v.normalize('NFKC'); } catch { /* 古い端末 */ }
+  v = v.replace(/[\s　​-‍﻿]/g, '');           // 空白・全角空白・ゼロ幅を全部落とす
+  v = v.replace(/[❓❔⁇‽﹖︖؟？]/g, '?');   // ❓❔⁇‽﹖︖؟？ → ?
+  v = v.replace(/️/g, '');                                     // 絵文字の異体字セレクタ
   return v;
 }
 /** 全角「？」・半角「?」のどちらも正解（NFKC で寄せる） */
@@ -58,9 +61,11 @@ export class Gate {
     </svg>
     <div class="gin">
       <div class="gq">合言葉は？</div>
-      <input id="gateInput" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="go" aria-label="合言葉">
-      <button class="gbtn" id="gateGo">ひらく</button>
+      <form id="gateForm" action="#" autocomplete="off">
+      <input id="gateInput" type="text" name="pass" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="go" aria-label="合言葉">
       <div class="gerr" id="gateErr">合言葉が違います</div>
+      <button class="gbtn" id="gateGo" type="submit">ひらく</button>
+      </form>
     </div>
   </div>
 </div>`;
@@ -71,9 +76,13 @@ export class Gate {
     this.input = $<HTMLInputElement>('gateInput');
     this.err = $('gateErr');
 
-    $('gateGo').addEventListener('click', () => this.submit());
+    // iOS のキーボード「go」/ Enter は form の submit で受ける（IME の確定と二重にならない）
+    $('gateForm').addEventListener('submit', (e: Event) => { e.preventDefault(); this.submit(); });
+    // ボタンを押した瞬間に入力欄がぼやけてキーボードが閉じ、click が消える事故を防ぐ
+    $('gateGo').addEventListener('pointerdown', (e: Event) => e.preventDefault());
     this.input.addEventListener('keydown', (e: KeyboardEvent) => {
-      if (e.key === 'Enter') { e.preventDefault(); this.submit(); }
+      const composing = e.isComposing || (e as KeyboardEvent & { keyCode: number }).keyCode === 229;
+      if (e.key === 'Enter' && !composing) { e.preventDefault(); this.submit(); }
       e.stopPropagation();                       // Enter/Space で本が開くのを止める
     });
     this.root.addEventListener('pointerdown', e => e.stopPropagation());
@@ -94,6 +103,10 @@ export class Gate {
   }
 
   private fail(): void {
+    if (QP.get('dbg') === '1') {                 // ?gate=1&dbg=1: 入力の文字コードを表示（実機の調査用）
+      const cps = Array.from(this.input.value).map(c => c.codePointAt(0)!.toString(16)).join(' ');
+      this.err.textContent = '合言葉が違います [' + cps + ']';
+    }
     this.input.value = '';
     this.wrap.classList.remove('shake');
     void this.wrap.offsetWidth;                  // アニメーションを巻き戻す
