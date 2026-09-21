@@ -225,6 +225,7 @@ export class Ui {
 
   // ---- ホーム画面に追加の一言（スタンドアロンでない時・モバイルの時だけ1回きり） ----
   private maybeA2hs(): void {
+    return;                                             // 2026-09-21 KEI: ホーム画面に追加の案内は出さない
     const standalone = (() => { try { return matchMedia('(display-mode: standalone)').matches || (navigator as unknown as { standalone?: boolean }).standalone === true; } catch { return false; } })();
     if (standalone || !/iPhone|iPad|iPod|Android/i.test(navigator.userAgent || '')) return;
     if (a2hsSeen()) return;
