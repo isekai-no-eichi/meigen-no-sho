@@ -4,7 +4,7 @@
 // iframe は廃止し、読書は同一ページの全画面レイヤー（reader/Reader.ts）。
 // ============================================================
 import * as THREE from 'three';
-import { BookScene, FLARE_GAIN } from './scene/BookScene';
+import { BookScene, FLARE_GAIN, REVEAL_SEC } from './scene/BookScene';
 import { Reader } from './reader/Reader';
 import { Ui } from './ui/Ui';
 import { Gate, gateNeeded } from './ui/Gate';
@@ -316,7 +316,7 @@ initAudioGlobalHooks();
 //   本は出さず（scale 0・塵と灯りはそのまま）、合言葉が合ったら枠が割れて本が現れる。
 //   2回目以降（bookexp-unlocked あり）は今までどおり、いきなり本が出る。
 const GATE = gateNeeded();
-const REVEAL_MS = 1400;               // BookScene.revealStart の出現時間と合わせる
+const REVEAL_MS = REVEAL_SEC * 1000;  // 出現の長さは BookScene の REVEAL_SEC が正（そこを直せば両方動く）
 // 合言葉を出している間と出現中は自転を止める（止めないと、合言葉に手間取った分だけ
 // 本が回った角度で現れ、いつもの入口と見え方がずれる・2026-09-21）
 let gateUp = GATE;

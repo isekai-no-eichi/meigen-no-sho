@@ -9,11 +9,12 @@
 // ============================================================
 import { QP, isUnlocked } from '../state';
 
-/** 合言葉の正解。変える時はここ1か所だけ直す */
-export const PASSPHRASE = '？';
+/** 合言葉の正解。変える時はここ1か所だけ直す（2026-09-21 KEI） */
+export const PASSPHRASE = '答えより？の美学';
 
-const SWEEP_MS = 900;      // 光が枠を一周する
-const SPLIT_MS = 500;      // 枠が左右に割れて消える
+// ---- 演出の長さ（KEI の微調整はこの3つ。CSS へも変数で渡すので、ここを直せば見た目も揃う） ----
+const SWEEP_MS = 1800;     // 光が枠を一周する（2026-09-21 KEI: 0.9s → 1.8s・尾を長く）
+const SPLIT_MS = 1000;     // 枠が左右に割れて消える（0.5s → 1.0s）
 const ERR_MS = 1500;       // 「合言葉が違います」を出しておく時間
 
 function norm(s: string): string {
@@ -70,6 +71,9 @@ export class Gate {
   </div>
 </div>`;
     this.root = wrap.firstElementChild as HTMLDivElement;
+    // 演出の長さは CSS にも渡す（定数はこのファイルだけが持つ）
+    this.root.style.setProperty('--gsweep', SWEEP_MS + 'ms');
+    this.root.style.setProperty('--gsplit', SPLIT_MS + 'ms');
     document.body.appendChild(this.root);
     const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
     this.wrap = this.root.querySelector('.gwrap') as HTMLDivElement;

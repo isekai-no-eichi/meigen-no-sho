@@ -67,8 +67,33 @@ const GradeShader = {
     }`,
 };
 
-/** 出現の時、本が回りながら正面を向く角度（+25°→0） */
-const REVEAL_YAW = 25 * Math.PI / 180;
+// ============================================================
+// 合言葉のあとの本の出現（2026-09-21 KEI「全体的にゆっくり・豪華に」）
+//   ★KEI が「もっと遅く／速く」と言った時に触るのはこのブロックだけ。
+// ============================================================
+/** 本が現れきるまで（秒）。main.ts の ui.start() もこの値に合わせて動く */
+export const REVEAL_SEC = 3.6;
+/** 回りながら正面を向く角度（Y軸 +40°→0） */
+const REVEAL_YAW = 40 * Math.PI / 180;
+/** わずかに傾いた姿勢から起き上がる角度（Z軸 4°→0） */
+const REVEAL_ROLL = 4 * Math.PI / 180;
+/** 光の粒: 1波目（本の中心から放射）／2波目（ゆっくり昇る塵）の出る時刻と寿命（秒） */
+const FX_WAVE1 = 0.4, FX_WAVE2 = 1.6, FX_LIFE = 4.5;
+/** 粒の総数（大粒と小粒に分けて撒く） */
+const FX_N = MOBILE ? 160 : 260;
+/** 出現しきる少し前から、金の淡い発光をブルームに足す（+30%）。戻すのに2秒 */
+const GLOW_LEAD = 0.8, GLOW_GAIN = 0.30, GLOW_FALL = 2.0;
+/** 滑らかなS字（smootherstep）。最初はごく小さく静かに、中盤でふわっと大きくなる */
+function smootherstep(k: number): number { return k * k * k * (k * (6 * k - 15) + 10); }
+
+/** 光の粒のひとかたまり（大粒・小粒 × 1波目・2波目の4つ） */
+interface Burst {
+  pts: THREE.Points; geo: THREE.BufferGeometry;
+  pos: Float32Array; vel: Float32Array; n: number;
+  at: number;      // revealStart から何秒後に撒くか
+  rise: boolean;   // true = ゆっくり昇る塵
+  t: number;       // 経過（-1 = 出ていない）
+}
 
 const RIB_YAW = -0.06;   // 栞タブの向き（本の上端＝奥端から覗く。2026-09-07 夜 KEI「本の上に挟む」）
 
@@ -120,11 +145,8 @@ export class BookScene {
   /** 本が消えている間も部屋・ろうそく・塵は描く（合言葉の画面） */
   keepAmbience = false;
   private revealT = -1;                         // -1 = 出現演出をしていない
-  private reveal: THREE.Points;
-  private rGeo = new THREE.BufferGeometry();
-  private rPos: Float32Array; private rVel: Float32Array;
-  private RN = MOBILE ? 70 : 110;
-  private revealFX = -1;                        // 光の粒の経過（2秒で消える）
+  private bursts: Burst[] = [];                 // 光の粒（大小×2波）
+  private glowT = -1;                           // ブルームを持ち上げている間の経過
 
   private composer: EffectComposer | null = null;
   private bloomPass: UnrealBloomPass | null = null;
@@ -201,15 +223,16 @@ export class BookScene {
     this.motes.visible = false;
     this.camera.add(this.motes);
 
-    // 合言葉のあと、本の位置から放射状に散る金の粒（2026-09-21 KEI）
-    this.rPos = new Float32Array(this.RN * 3); this.rVel = new Float32Array(this.RN * 3);
-    this.rGeo.setAttribute('position', new THREE.BufferAttribute(this.rPos, 3));
-    this.reveal = new THREE.Points(this.rGeo, new THREE.PointsMaterial({
-      size: 0.013, map: new THREE.CanvasTexture(c), transparent: true, opacity: 0,
-      depthWrite: false, blending: THREE.AdditiveBlending, color: 0xe6c690,
-    }));
-    this.reveal.visible = false;
-    this.scene.add(this.reveal);
+    // 合言葉のあとに散る金の粒。大粒と小粒を混ぜ、1波目=放射／2波目=ゆっくり昇る塵
+    const fxTex = new THREE.CanvasTexture(c);
+    const w1 = Math.round(FX_N * 0.6), w2 = FX_N - w1;
+    const w1b = Math.round(w1 * 0.35), w2b = Math.round(w2 * 0.35);
+    this.bursts = [
+      this.makeBurst(w1b, 0.017, fxTex, FX_WAVE1, false),
+      this.makeBurst(w1 - w1b, 0.009, fxTex, FX_WAVE1, false),
+      this.makeBurst(w2b, 0.014, fxTex, FX_WAVE2, true),
+      this.makeBurst(w2 - w2b, 0.008, fxTex, FX_WAVE2, true),
+    ];
 
     this.buildComposer();
   }
@@ -499,47 +522,94 @@ export class BookScene {
   // ---- 合言葉のあとの出現（2026-09-21 KEI） ----
   /** 本を消しておく（合言葉の画面のあいだ） */
   hideBook(): void { this.bookScale = 0; this.bookTarget = 0; this.pivot.scale.setScalar(0.0001); }
-  /** 本が現れる。scale 0→1（1.4秒 easeOutCubic）＋ Y軸 +25°→0、同時に金の粒が散る */
+
+  private makeBurst(n: number, size: number, map: THREE.Texture, at: number, rise: boolean): Burst {
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(n * 3), vel = new Float32Array(n * 3);
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({
+      size, map, transparent: true, opacity: 0, depthWrite: false,
+      blending: THREE.AdditiveBlending, color: 0xe6c690,
+    }));
+    pts.visible = false;
+    this.scene.add(pts);
+    return { pts, geo, pos, vel, n, at, rise, t: -1 };
+  }
+
+  /** 粒を撒く。rise=false は本の中心から放射、rise=true は本の周りからゆっくり昇る塵 */
+  private burstSpawn(b: Burst): void {
+    const o = this.pivot.position;
+    for (let i = 0; i < b.n; i++) {
+      const th = Math.random() * Math.PI * 2, ph = Math.acos(2 * Math.random() - 1);
+      if (b.rise) {
+        const r = 0.05 + Math.random() * 0.22;
+        b.pos[i * 3] = o.x + Math.cos(th) * r;
+        b.pos[i * 3 + 1] = o.y - 0.05 + Math.random() * 0.10;
+        b.pos[i * 3 + 2] = o.z + Math.sin(th) * r;
+        b.vel[i * 3] = (Math.random() - 0.5) * 0.020;
+        b.vel[i * 3 + 1] = 0.018 + Math.random() * 0.038;
+        b.vel[i * 3 + 2] = (Math.random() - 0.5) * 0.020;
+      } else {
+        const sp = 0.07 + Math.random() * 0.20;
+        b.pos[i * 3] = o.x + (Math.random() - 0.5) * 0.04;
+        b.pos[i * 3 + 1] = o.y + (Math.random() - 0.5) * 0.03;
+        b.pos[i * 3 + 2] = o.z + (Math.random() - 0.5) * 0.04;
+        b.vel[i * 3] = Math.sin(ph) * Math.cos(th) * sp;
+        b.vel[i * 3 + 1] = Math.cos(ph) * sp * 0.6 + 0.035;
+        b.vel[i * 3 + 2] = Math.sin(ph) * Math.sin(th) * sp;
+      }
+    }
+    b.geo.attributes.position.needsUpdate = true;
+    b.pts.visible = true;
+    b.t = 0;
+  }
+
+  /** 本が現れる。scale 0→1（REVEAL_SEC・S字）＋ Y +40°→0・Z 4°→0、光の粒は2波 */
   revealStart(): void {
     this.revealT = 0; this.bookTarget = 1; this.bookScale = 0;
-    this.revealFX = 0; this.reveal.visible = true;
-    const o = this.pivot.position;
-    for (let i = 0; i < this.RN; i++) {
-      // 本の位置から放射状に。上へ少し流れる
-      const th = Math.random() * Math.PI * 2, ph = Math.acos(2 * Math.random() - 1);
-      const sp = 0.10 + Math.random() * 0.26;
-      this.rPos[i * 3] = o.x + (Math.random() - 0.5) * 0.04;
-      this.rPos[i * 3 + 1] = o.y + (Math.random() - 0.5) * 0.03;
-      this.rPos[i * 3 + 2] = o.z + (Math.random() - 0.5) * 0.04;
-      this.rVel[i * 3] = Math.sin(ph) * Math.cos(th) * sp;
-      this.rVel[i * 3 + 1] = Math.cos(ph) * sp * 0.7 + 0.05;
-      this.rVel[i * 3 + 2] = Math.sin(ph) * Math.sin(th) * sp;
-    }
-    this.rGeo.attributes.position.needsUpdate = true;
+    this.glowT = -1;
+    for (const b of this.bursts) { b.t = -1; b.pts.visible = false; }
   }
-  /** 出現中か（main.ts のループが自転などを止める判断に使う） */
+  /** 出現中か */
   get revealing(): boolean { return this.revealT >= 0; }
+
   private revealStep(dt: number): void {
     if (this.revealT >= 0) {
       this.revealT += dt;
-      const k = Math.min(this.revealT / 1.4, 1), e = 1 - Math.pow(1 - k, 3);
+      const k = Math.min(this.revealT / REVEAL_SEC, 1), e = smootherstep(k);
       this.bookScale = e;
       this.pivot.rotation.y = (1 - e) * REVEAL_YAW;
-      if (k >= 1) { this.revealT = -1; this.pivot.rotation.y = 0; this.bookScale = 1; }
+      this.pivot.rotation.z = (1 - e) * REVEAL_ROLL;
+      // 波の点火（revealT を基準にするので、フレーム落ちしてもタイミングがずれない）
+      for (const b of this.bursts) if (b.t < 0 && this.revealT >= b.at) this.burstSpawn(b);
+      // 出来上がる少し前から、金の淡い発光
+      if (this.glowT < 0 && this.revealT >= REVEAL_SEC - GLOW_LEAD) this.glowT = 0;
+      if (k >= 1) { this.revealT = -1; this.pivot.rotation.y = 0; this.pivot.rotation.z = 0; this.bookScale = 1; }
     }
-    if (this.revealFX >= 0) {
-      this.revealFX += dt;
-      const k = Math.min(this.revealFX / 2.0, 1);
-      for (let i = 0; i < this.RN; i++) {
-        const d = Math.exp(-dt / 0.55);                 // すっと減速して漂う
-        this.rVel[i * 3] *= d; this.rVel[i * 3 + 2] *= d; this.rVel[i * 3 + 1] = this.rVel[i * 3 + 1] * d + 0.012 * dt;
-        this.rPos[i * 3] += this.rVel[i * 3] * dt;
-        this.rPos[i * 3 + 1] += this.rVel[i * 3 + 1] * dt;
-        this.rPos[i * 3 + 2] += this.rVel[i * 3 + 2] * dt;
+    // 光の粒
+    for (const b of this.bursts) {
+      if (b.t < 0) continue;
+      b.t += dt;
+      const k = Math.min(b.t / FX_LIFE, 1), drag = Math.exp(-dt / (b.rise ? 2.4 : 0.9));
+      for (let i = 0; i < b.n; i++) {
+        b.vel[i * 3] *= drag; b.vel[i * 3 + 2] *= drag;
+        b.vel[i * 3 + 1] = b.vel[i * 3 + 1] * drag + 0.010 * dt;     // 最後はゆっくり昇る
+        b.pos[i * 3] += b.vel[i * 3] * dt;
+        b.pos[i * 3 + 1] += b.vel[i * 3 + 1] * dt;
+        b.pos[i * 3 + 2] += b.vel[i * 3 + 2] * dt;
       }
-      this.rGeo.attributes.position.needsUpdate = true;
-      (this.reveal.material as THREE.PointsMaterial).opacity = 0.85 * Math.min(1, k * 8) * (1 - k) * (1 - k * 0.2);
-      if (k >= 1) { this.revealFX = -1; this.reveal.visible = false; }
+      b.geo.attributes.position.needsUpdate = true;
+      (b.pts.material as THREE.PointsMaterial).opacity = 0.8 * Math.min(1, b.t / 0.45) * (1 - k) * (1 - k * 0.25);
+      if (k >= 1) { b.t = -1; b.pts.visible = false; }
+    }
+    // ブルームを +30% して 2秒でもとへ（ブルームが無い端末では大粒のグローが代わりになる）
+    if (this.glowT >= 0) {
+      this.glowT += dt;
+      const up = Math.min(1, this.glowT / GLOW_LEAD);
+      const down = this.glowT <= GLOW_LEAD ? 1 : Math.max(0, 1 - (this.glowT - GLOW_LEAD) / GLOW_FALL);
+      const g = up * down;
+      if (this.bloomPass) this.bloomPass.strength = BLOOM_BASE * (1 + GLOW_GAIN * g);
+      if (g <= 0) { this.glowT = -1; if (this.bloomPass) this.bloomPass.strength = BLOOM_BASE; }
     }
   }
 
@@ -614,7 +684,7 @@ export class BookScene {
     if (!book) return;
     const { dt, wdt, t } = opts;
 
-    if (this.revealT >= 0 || this.revealFX >= 0) this.revealStep(wdt);
+    if (this.revealT >= 0 || this.glowT >= 0 || this.bursts.some(b => b.t >= 0)) this.revealStep(wdt);
     else this.bookScale += (this.bookTarget - this.bookScale) * (1 - Math.exp(-wdt / 0.28));
     this.pivot.scale.setScalar(Math.max(0.0001, this.bookScale));
     this.pivot.position.y = 0.10 + Math.sin(t * 0.9) * 0.008;
