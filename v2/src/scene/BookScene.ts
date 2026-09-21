@@ -24,6 +24,16 @@ import { RoomBackground } from './RoomBackground';
 const TITLE_DECAL = false;
 const QUALITY = !QP.has('classic');
 const CAM_R = 1.55;
+/** ?icon=1 … ホーム画面アイコン撮影用。本を直立させて正面から撮る（自転・部屋・栞・塵なし）。
+ *  通常の閲覧には一切影響しない。角度は ?irx / ?iry / ?ith / ?iph / ?ir で微調整できる。 */
+const ICON = QP.has('icon');
+const qn = (k: string, d: number): number => (QP.has(k) ? Number(QP.get(k)) : d);
+/** 撮影パラメータ。window.__icon で毎フレーム上書きできる（探索を速くするため。通常運転では未使用） */
+const iq = (k: string, d: number): number => {
+  const w = (window as unknown as { __icon?: Record<string, number> }).__icon;
+  if (w && typeof w[k] === 'number') return w[k];
+  return qn(k, d);
+};
 const CANDLE_I = QUALITY ? 1.55 : 1.3;   // 2026-09-09 KEI: 右下の光が強い→半減
 const DIVE_DUR = 1.6;                     // ページの間へ潜る時間（秒）
 /** 開く演出の光の強さの係数。2026-09-07 KEI: 光が強すぎる→半分 */
@@ -88,6 +98,7 @@ export class BookScene {
   private rimB: THREE.DirectionalLight;
   private rimHome = new THREE.Vector3(-0.8, 0.9, -0.6);
   private capture: ((url: string) => void) | null = null;
+  private iconKey: THREE.DirectionalLight | null = null;
   /** 開く演出の光量 0..1（main.ts の台本が毎フレーム入れる） */
   openFlare = 0;
   /** 表紙の箔に光が走る 0..1 */
@@ -215,6 +226,20 @@ export class BookScene {
       this.pivot.scale.setScalar(1); this.bookScale = 1; this.bookTarget = 1;
       this.buildRibbon(); this.buildFavMarks(); if (QUALITY) this.buildStage();
       if (TITLE_DECAL) this.buildTitleDecal(cover || null);   // 2026-09-08 KEI: 表紙の「名言の書」は消す
+      if (ICON) {
+        book.rotation.z = 0;
+        if (this.ribbon) this.ribbon.visible = false;
+        if (this.favMarks) this.favMarks.visible = false;
+        if (this.stageGroup) this.stageGroup.visible = false;
+        this.dust.visible = false; this.motes.visible = false;
+        this.room.object.visible = false;
+        this.fireB.intensity = 0;
+        this.rimB.color.set(0xffe2ba); this.rimB.intensity = qn('irim', 0.30);
+        const key = new THREE.DirectionalLight(0xffe4c0, qn('ikey', 2.0));
+        key.position.set(0.55, 0.75, 1.9); this.scene.add(key); this.iconKey = key;
+        this.scene.add(new THREE.AmbientLight(0xffdcb4, qn('ifill', 1.1)));
+        if (this.gradePass) this.gradePass.uniforms.uVig.value = qn('ivig', 0.08);
+      }
       onReady();
     });
   }
@@ -586,6 +611,33 @@ export class BookScene {
 
     const sx0 = this.shake * Math.sin(t * 57) * 0.012, sy0 = this.shake * Math.sin(t * 43 + 1) * 0.008;
     const cam = this.camera;
+    if (ICON) {
+      // アイコン撮影モード：本を立てて正面から。揺れ・自転・浮遊なし。
+      this.dust.visible = false; this.motes.visible = false;
+      this.room.object.visible = false;
+      this.pivot.position.y = 0;
+      // 姿勢は yaw/pitch/roll（度）でワールド軸まわりに指定する。カメラは正面固定。
+      const D = Math.PI / 180;
+      const q = new THREE.Quaternion()
+        .setFromAxisAngle(new THREE.Vector3(0, 0, 1), iq('roll', -2) * D)
+        .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), iq('pitch', -5) * D))
+        .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), iq('yaw', -8) * D))
+        .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2));
+      this.pivot.quaternion.copy(q);
+      this.candleB.position.set(iq('icx', 0.42), iq('icy', 0.34), iq('icz', 0.72));
+      this.candleB.intensity = iq('ici', 2.4);
+      if (this.iconKey) this.iconKey.intensity = iq('ikey', 2.0);
+      this.rimB.intensity = iq('irim', 0.30);
+      this.renderer.toneMappingExposure = iq('iexp', 1.32);
+      if (this.gradePass) this.gradePass.uniforms.uVig.value = iq('ivig', 0.08);
+      const fov = iq('fov', 38);
+      if (Math.abs(cam.fov - fov) > 0.01) { cam.fov = fov; cam.updateProjectionMatrix(); }
+      cam.position.set(0, 0, iq('dist', 1.02));
+      cam.lookAt(0, 0, 0);
+      if (this.composer) this.composer.render(); else this.renderer.render(this.scene, cam);
+      if (this.capture) { const cb = this.capture; this.capture = null; cb(''); }
+      return;
+    }
     if (opts.diving) {
       const k = Math.min(opts.diveT / DIVE_DUR, 1), e2 = k * k * k * (k * (6 * k - 15) + 10);
       // 潜りは「表紙が開く間に寄せた距離」(CAM_R-0.26) から始める。CAM_R から始めると一瞬引いてガクッとなる（2026-09-07 夜 KEI指摘）
