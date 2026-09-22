@@ -13,8 +13,9 @@ import { QP, isUnlocked } from '../state';
 export const PASSPHRASE = '答えより？の美学';
 
 // ---- 演出の長さ（KEI の微調整はこの3つ。CSS へも変数で渡すので、ここを直せば見た目も揃う） ----
-const SWEEP_MS = 1800;     // 光が枠を一周する（2026-09-21 KEI: 0.9s → 1.8s・尾を長く）
-const SPLIT_MS = 1000;     // 枠が左右に割れて消える（0.5s → 1.0s）
+// 2026-09-22 KEI「簡素に」: 枠の光の一周はやめ、枠は静かに消えるだけ。
+const SWEEP_MS = 0;        // 0 = 縁を走る光を出さない（戻す時は 1800 などにする）
+const SPLIT_MS = 600;      // 枠が静かにフェードアウトする時間
 const ERR_MS = 1500;       // 「合言葉が違います」を出しておく時間
 
 function norm(s: string): string {
@@ -124,7 +125,7 @@ export class Gate {
     this.err.classList.remove('show');
     this.input.blur();
     this.input.disabled = true;
-    this.root.classList.add('ok');               // 縁を光が一周する
+    this.root.classList.add('ok');               // （SWEEP_MS > 0 の時だけ縁を光が走る）
     setTimeout(() => {
       this.root.classList.add('split');          // 枠が左右に割れる／中身が消える
       setTimeout(() => {

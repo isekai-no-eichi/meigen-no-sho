@@ -72,11 +72,16 @@ const GradeShader = {
 //   ★KEI が「もっと遅く／速く」と言った時に触るのはこのブロックだけ。
 // ============================================================
 /** 本が現れきるまで（秒）。main.ts の ui.start() もこの値に合わせて動く */
-export const REVEAL_SEC = 3.6;
-/** 回りながら正面を向く角度（Y軸 +40°→0） */
-const REVEAL_YAW = 40 * Math.PI / 180;
-/** わずかに傾いた姿勢から起き上がる角度（Z軸 4°→0） */
-const REVEAL_ROLL = 4 * Math.PI / 180;
+export const REVEAL_SEC = 3.2;
+/** 回りながら正面を向く角度（Y軸 +30°→0） */
+const REVEAL_YAW = 30 * Math.PI / 180;
+/** 奥から手前へ来る距離。カメラから見て、この分だけ奥に置いた状態から寄ってくる */
+const REVEAL_DEPTH = 0.9;
+/** 姿勢の傾き戻し（2026-09-22 KEI「簡素に」→ 0＝使わない） */
+const REVEAL_ROLL = 0;
+/** 2026-09-22 KEI「簡素に」: 光の粒とブルームの持ち上げはやめた。
+ *  戻したい時は FX_ON / GLOW_ON を true にすれば、下のコードがそのまま動く。 */
+const FX_ON = false, GLOW_ON = false;
 /** 光の粒: 1波目（本の中心から放射）／2波目（ゆっくり昇る塵）の出る時刻と寿命（秒） */
 const FX_WAVE1 = 0.4, FX_WAVE2 = 1.6, FX_LIFE = 4.5;
 /** 粒の総数（大粒と小粒に分けて撒く） */
@@ -94,6 +99,9 @@ interface Burst {
   rise: boolean;   // true = ゆっくり昇る塵
   t: number;       // 経過（-1 = 出ていない）
 }
+
+/** 本が自分の影を受けるか。2026-09-22 KEI: 表紙を走る縞の影が邪魔 → false（机の接地影は残る） */
+const BOOK_SELF_SHADOW = false;
 
 const RIB_YAW = -0.06;   // 栞タブの向き（本の上端＝奥端から覗く。2026-09-07 夜 KEI「本の上に挟む」）
 
@@ -145,8 +153,10 @@ export class BookScene {
   /** 本が消えている間も部屋・ろうそく・塵は描く（合言葉の画面） */
   keepAmbience = false;
   private revealT = -1;                         // -1 = 出現演出をしていない
-  private bursts: Burst[] = [];                 // 光の粒（大小×2波）
+  private bursts: Burst[] = [];                 // 光の粒（大小×2波・FX_ON の時だけ）
   private glowT = -1;                           // ブルームを持ち上げている間の経過
+  /** 出現中、カメラの視線方向へ退いている距離（0 = 通常位置） */
+  private revealBack = 0;
 
   private composer: EffectComposer | null = null;
   private bloomPass: UnrealBloomPass | null = null;
@@ -225,7 +235,7 @@ export class BookScene {
 
     // 合言葉のあとに散る金の粒。大粒と小粒を混ぜ、1波目=放射／2波目=ゆっくり昇る塵
     const fxTex = new THREE.CanvasTexture(c);
-    const w1 = Math.round(FX_N * 0.6), w2 = FX_N - w1;
+    const w1 = FX_ON ? Math.round(FX_N * 0.6) : 0, w2 = FX_ON ? FX_N - w1 : 0;
     const w1b = Math.round(w1 * 0.35), w2b = Math.round(w2 * 0.35);
     this.bursts = [
       this.makeBurst(w1b, 0.017, fxTex, FX_WAVE1, false),
@@ -258,7 +268,9 @@ export class BookScene {
           mat.roughness = Math.max(mat.roughness || 0, 0.95);
           mat.metalness = 0;
           if (mat.color) mat.color.multiplyScalar(0.86);
-          if (QUALITY) { m.castShadow = true; m.receiveShadow = true; mat.envMapIntensity = 0.22; }
+          // 2026-09-22 KEI「回している時、本に変な影が付く」→ 本は影を「落とす」だけにし、
+          // 自分の影を「受けない」。机への柔らかい接地影はそのまま残る。
+          if (QUALITY) { m.castShadow = true; m.receiveShadow = BOOK_SELF_SHADOW; mat.envMapIntensity = 0.22; }
         }
       });
       if (QUALITY) this.applyLeather(book);
@@ -564,10 +576,10 @@ export class BookScene {
     b.t = 0;
   }
 
-  /** 本が現れる。scale 0→1（REVEAL_SEC・S字）＋ Y +40°→0・Z 4°→0、光の粒は2波 */
+  /** 本が現れる。奥から手前へ寄りながら scale 0→1（REVEAL_SEC・S字）＋ Y +30°→0 */
   revealStart(): void {
     this.revealT = 0; this.bookTarget = 1; this.bookScale = 0;
-    this.glowT = -1;
+    this.glowT = -1; this.revealBack = REVEAL_DEPTH;
     for (const b of this.bursts) { b.t = -1; b.pts.visible = false; }
   }
   /** 出現中か */
@@ -580,11 +592,17 @@ export class BookScene {
       this.bookScale = e;
       this.pivot.rotation.y = (1 - e) * REVEAL_YAW;
       this.pivot.rotation.z = (1 - e) * REVEAL_ROLL;
+      // 「奥から」出てくる。カメラの視線方向へ (1-e)*REVEAL_DEPTH ぶん退いた所から寄ってくる。
+      // カメラは本の周りを回るので、世界座標の固定軸ではなく視線に沿って動かす。
+      this.revealBack = (1 - e) * REVEAL_DEPTH;
       // 波の点火（revealT を基準にするので、フレーム落ちしてもタイミングがずれない）
-      for (const b of this.bursts) if (b.t < 0 && this.revealT >= b.at) this.burstSpawn(b);
+      if (FX_ON) for (const b of this.bursts) if (b.t < 0 && this.revealT >= b.at) this.burstSpawn(b);
       // 出来上がる少し前から、金の淡い発光
-      if (this.glowT < 0 && this.revealT >= REVEAL_SEC - GLOW_LEAD) this.glowT = 0;
-      if (k >= 1) { this.revealT = -1; this.pivot.rotation.y = 0; this.pivot.rotation.z = 0; this.bookScale = 1; }
+      if (GLOW_ON && this.glowT < 0 && this.revealT >= REVEAL_SEC - GLOW_LEAD) this.glowT = 0;
+      if (k >= 1) {
+        this.revealT = -1; this.revealBack = 0;
+        this.pivot.rotation.y = 0; this.pivot.rotation.z = 0; this.bookScale = 1;
+      }
     }
     // 光の粒
     for (const b of this.bursts) {
@@ -688,6 +706,15 @@ export class BookScene {
     else this.bookScale += (this.bookTarget - this.bookScale) * (1 - Math.exp(-wdt / 0.28));
     this.pivot.scale.setScalar(Math.max(0.0001, this.bookScale));
     this.pivot.position.y = 0.10 + Math.sin(t * 0.9) * 0.008;
+    if (this.revealBack > 0) {
+      // カメラから本へ向かう向きの逆＝「奥」。出現中だけ、その分だけ退かせる
+      const c = this.camera.position, d = Math.max(1e-4, Math.hypot(c.x, c.y, c.z));
+      this.pivot.position.x = c.x / d * this.revealBack;
+      this.pivot.position.y += c.y / d * this.revealBack;
+      this.pivot.position.z = c.z / d * this.revealBack;
+    } else if (this.pivot.position.x !== 0 || this.pivot.position.z !== 0) {
+      this.pivot.position.x = 0; this.pivot.position.z = 0;
+    }
     if (opts.autoSpin) this.camTheta += dt * 0.055;
     while (this.camTheta > Math.PI) this.camTheta -= Math.PI * 2;
     while (this.camTheta < -Math.PI) this.camTheta += Math.PI * 2;

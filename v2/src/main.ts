@@ -156,6 +156,7 @@ const PRELUDE = 1.55;                 // 文字が消える 0.6 ＋ 間 0.95
 
 function beginRead(mode: string, title?: string): void {
   if (stage !== 'book') return;
+  if (gateUp) return;                 // 合言葉が済むまでは、どの経路からも開かない（2026-09-22）
   // 2026-09-09 KEI: 開くたびに自動で全画面。ダブルタップ／「しおりから読む」「お気に入りを読む」／
   // Enter・Space のどれもこの関数へ直に来るので、ここが「利用者の操作の中」。
   // **await や setTimeout より前**に呼ばないとブラウザに断られる。
@@ -267,7 +268,7 @@ function closeBookDone(): void {
 // ============================================================ 本の画面の入力（回転 / タップ）
 let downAt = 0, downX = 0, downY = 0, moved = false;
 canvas.addEventListener('pointerdown', e => {
-  if (stage !== 'book') return;
+  if (stage !== 'book' || gateUp) return;
   dragging = true; lastX = e.clientX; lastY = e.clientY;
   downAt = performance.now(); downX = e.clientX; downY = e.clientY; moved = false;
 });
@@ -281,7 +282,7 @@ addEventListener('pointermove', e => {
 addEventListener('pointerup', () => {
   if (!dragging) return;
   dragging = false;
-  if (!moved && performance.now() - downAt < 300 && stage === 'book') ui.tap();
+  if (!moved && performance.now() - downAt < 300 && stage === 'book' && !gateUp) ui.tap();
 });
 
 // ============================================================ 端末の傾き
@@ -313,31 +314,39 @@ scene.resize();
 initAudioGlobalHooks();
 
 // 初回だけの合言葉ゲート（2026-09-21 KEI）。
-//   本は出さず（scale 0・塵と灯りはそのまま）、合言葉が合ったら枠が割れて本が現れる。
+//   本は出さず（scale 0・塵と灯りはそのまま）、合言葉が合ったら枠が消えて本が奥から現れる。
 //   2回目以降（bookexp-unlocked あり）は今までどおり、いきなり本が出る。
+// 2026-09-22 KEI【バグ修正】合言葉を打たずに連打すると開くことがあった。
+//   原因は本(GLB)の読み込み待ちのすき間。scene.load のコールバックで初めて錠を下ろしていたため、
+//   読み込み中の数百ms〜数秒は錠なし＝2回タップがそのまま通っていた。
+//   → 錠（ui.setLocked）と合言葉の画面は **読み込みを待たず、ここで先に** 出す。
+//     さらに gateUp を「本を開く」全経路（beginRead・canvas のタップ）の入口で見る。
 const GATE = gateNeeded();
 const REVEAL_MS = REVEAL_SEC * 1000;  // 出現の長さは BookScene の REVEAL_SEC が正（そこを直せば両方動く）
-// 合言葉を出している間と出現中は自転を止める（止めないと、合言葉に手間取った分だけ
-// 本が回った角度で現れ、いつもの入口と見え方がずれる・2026-09-21）
+// 合言葉を出している間と出現中は、自転も「本を開く」操作も止める
 let gateUp = GATE;
 
-scene.load(() => {
-  scene.resize();
-  if (!GATE) { ui.start(); return; }
+if (GATE) {
   scene.hideBook();
   scene.keepAmbience = true;
-  ui.setLocked(true);                      // 合言葉の間は2回タップで開かない
+  ui.setLocked(true);                      // 読み込みを待たずに錠を下ろす（連打で開く穴を塞ぐ）
   const gate = new Gate(() => {
     scene.revealStart();
     setTimeout(() => {
       scene.keepAmbience = false;          // 本が出そろってから、ふだんの描画条件に戻す
-      gateUp = false;                      // ここから自転も再開
+      gateUp = false;                      // ここから自転も、本を開く操作も再開
       markUnlocked();
       ui.setLocked(false);
       ui.start();                          // ここから通常運転（2秒後に「2回タップで、本を読む」）
     }, REVEAL_MS);
   });
   gate.show();
+}
+
+scene.load(() => {
+  scene.resize();
+  if (GATE) { scene.hideBook(); return; }  // 読み込み完了時にも本を消し直す（load が scale 1 にするため）
+  ui.start();
 });
 
 scene.renderer.setAnimationLoop(() => {
