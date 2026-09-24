@@ -10,12 +10,12 @@
 import { QP, isUnlocked } from '../state';
 
 /** 合言葉の正解。変える時はここ1か所だけ直す（2026-09-21 KEI） */
-export const PASSPHRASE = '答えより？の美学';
+export const PASSPHRASE = '？の美学';  // 2026-09-24 KEI 変更（旧: 答えより？の美学）
 
 // ---- 演出の長さ（KEI の微調整はこの3つ。CSS へも変数で渡すので、ここを直せば見た目も揃う） ----
 // 2026-09-22 KEI「簡素に」: 枠の光の一周はやめ、枠は静かに消えるだけ。
-const SWEEP_MS = 0;        // 0 = 縁を走る光を出さない（戻す時は 1800 などにする）
-const SPLIT_MS = 600;      // 枠が静かにフェードアウトする時間
+const SWEEP_MS = 1800;     // 縁を光が一周してから割れる（2026-09-24 KEI 復活。0 = 出さない）
+const SPLIT_MS = 900;      // 枠が静かにフェードアウトする時間
 const ERR_MS = 1500;       // 「合言葉が違います」を出しておく時間
 
 function norm(s: string): string {

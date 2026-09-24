@@ -72,7 +72,7 @@ const GradeShader = {
 //   ★KEI が「もっと遅く／速く」と言った時に触るのはこのブロックだけ。
 // ============================================================
 /** 本が現れきるまで（秒）。main.ts の ui.start() もこの値に合わせて動く */
-export const REVEAL_SEC = 3.2;
+export const REVEAL_SEC = 8.0;   // 2026-09-24 KEI「もっとゆっくり・光と一緒に」3.2→8.0（約2.5倍）
 /** 回りながら正面を向く角度（Y軸 +30°→0） */
 const REVEAL_YAW = 30 * Math.PI / 180;
 /** 奥から手前へ来る距離。カメラから見て、この分だけ奥に置いた状態から寄ってくる */
@@ -81,13 +81,13 @@ const REVEAL_DEPTH = 0.9;
 const REVEAL_ROLL = 0;
 /** 2026-09-22 KEI「簡素に」: 光の粒とブルームの持ち上げはやめた。
  *  戻したい時は FX_ON / GLOW_ON を true にすれば、下のコードがそのまま動く。 */
-const FX_ON = false, GLOW_ON = false;
+const FX_ON = true, GLOW_ON = true;   // 2026-09-24 KEI 復活（光と一緒に浮かび上がる）
 /** 光の粒: 1波目（本の中心から放射）／2波目（ゆっくり昇る塵）の出る時刻と寿命（秒） */
-const FX_WAVE1 = 0.4, FX_WAVE2 = 1.6, FX_LIFE = 4.5;
+const FX_WAVE1 = 1.0, FX_WAVE2 = 4.0, FX_LIFE = 6.0;   // 出現8秒に合わせて2.5倍寄せ（旧 0.4/1.6/4.5）
 /** 粒の総数（大粒と小粒に分けて撒く） */
 const FX_N = MOBILE ? 160 : 260;
 /** 出現しきる少し前から、金の淡い発光をブルームに足す（+30%）。戻すのに2秒 */
-const GLOW_LEAD = 0.8, GLOW_GAIN = 0.30, GLOW_FALL = 2.0;
+const GLOW_LEAD = 2.0, GLOW_GAIN = 0.30, GLOW_FALL = 3.0;   // ゆっくり持ち上げ・上品に+30%のまま（旧 0.8/0.30/2.0）
 /** 滑らかなS字（smootherstep）。最初はごく小さく静かに、中盤でふわっと大きくなる */
 function smootherstep(k: number): number { return k * k * k * (k * (6 * k - 15) + 10); }
 
