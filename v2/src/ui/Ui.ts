@@ -42,6 +42,7 @@ export class Ui {
     const wrap = document.createElement('div');
     wrap.innerHTML = `
 <div id="hint"><div class="rule"></div><div class="txt">2回タップで、本を読む</div></div>
+<div id="landMsg">縦にしてください</div>
 <div id="ui">
   <button class="seal wide" id="bInfo">この本の説明</button>
   <button class="seal wide" id="bResume" aria-label="しおりから読む" hidden>しおりから読む</button>

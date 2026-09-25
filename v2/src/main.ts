@@ -154,9 +154,17 @@ let openT0 = 0, lifting = false;
 //   → 約1秒の間（何も出ない）→「名言の書」がフェードで現れる → 本の中へ吸い込まれる
 const PRELUDE = 1.55;                 // 文字が消える 0.6 ＋ 間 0.95
 
+// 横向き（高さ 500px 未満）の入口では「縦にしてください」を出し、ボタンと2回タップを止める（2026-09-26 QA D13）。
+// 縦に戻せば通常。読書画面はそのまま。
+const LAND = matchMedia('(orientation: landscape) and (max-height: 499px)');
+const syncLand = () => document.body.classList.toggle('land-block', LAND.matches);
+try { LAND.addEventListener('change', syncLand); } catch { LAND.addListener(syncLand); }
+syncLand();
+
 function beginRead(mode: string, title?: string): void {
   if (stage !== 'book') return;
   if (gateUp) return;                 // 合言葉が済むまでは、どの経路からも開かない（2026-09-22）
+  if (LAND.matches) return;           // 横向きの入口からは開かない（2026-09-26 QA）
   // 2026-09-09 KEI: 開くたびに自動で全画面。ダブルタップ／「しおりから読む」「お気に入りを読む」／
   // Enter・Space のどれもこの関数へ直に来るので、ここが「利用者の操作の中」。
   // **await や setTimeout より前**に呼ばないとブラウザに断られる。
@@ -282,7 +290,7 @@ addEventListener('pointermove', e => {
 addEventListener('pointerup', () => {
   if (!dragging) return;
   dragging = false;
-  if (!moved && performance.now() - downAt < 300 && stage === 'book' && !gateUp) ui.tap();
+  if (!moved && performance.now() - downAt < 300 && stage === 'book' && !gateUp && !LAND.matches) ui.tap();
 });
 
 // ============================================================ 端末の傾き
@@ -332,6 +340,7 @@ if (GATE) {
   ui.setLocked(true);                      // 読み込みを待たずに錠を下ろす（連打で開く穴を塞ぐ）
   const gate = new Gate(() => {
     scene.revealStart();
+    reader.prime();                        // 出現の約10秒で最初の3枚を先読み（遅い回線でも読書画面が真っ暗にならない・2026-09-26 QA）
     setTimeout(() => {
       scene.keepAmbience = false;          // 本が出そろってから、ふだんの描画条件に戻す
       gateUp = false;                      // ここから自転も、本を開く操作も再開

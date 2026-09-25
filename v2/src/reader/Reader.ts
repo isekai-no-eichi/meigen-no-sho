@@ -99,7 +99,7 @@ export class Reader {
     ribbon: HTMLDivElement; paperGlow: HTMLDivElement; candle: HTMLDivElement; shade: HTMLDivElement;
     halo: HTMLDivElement; candleImg: HTMLImageElement; flameGlow: HTMLDivElement; flame: HTMLDivElement;
     veil: HTMLDivElement; seen: HTMLDivElement; backBtn: HTMLDivElement; favBtn: HTMLDivElement;
-    favListBtn: HTMLDivElement; setBtn: HTMLDivElement; toast: HTMLDivElement; favPanel: HTMLDivElement;
+    favListBtn: HTMLDivElement; setBtn: HTMLDivElement; toast: HTMLDivElement; favPanel: HTMLDivElement; load: HTMLDivElement;
   };
 
   constructor(private hooks: ReaderHooks) {
@@ -124,6 +124,7 @@ export class Reader {
 <div id="favListBtn" role="button" tabindex="0" aria-label="栞"><b><svg width="14" height="18" viewBox="0 0 14 18" fill="none" stroke="#c9a24a" stroke-width="1.3"><path d="M2 1h10v16l-5-4-5 4z"/></svg></b><span>栞</span></div>
 <div id="setBtn" role="button" tabindex="0" aria-label="音の入切"><b></b><span>音</span></div>
 <div id="toast"></div>
+<div id="rload" aria-live="polite">読み込み中</div>
 <div id="favPanel"><div class="box"><h2>お気に入りのページ</h2>
 <div class="empty" id="favEmpty">まだお気に入りのページがない</div><button class="close" id="favClose">閉じる</button></div></div>`;
     document.body.appendChild(this.root);
@@ -137,7 +138,7 @@ export class Reader {
       ribbon: q('ribbon'), paperGlow: q('paperGlow'), candle: q('candle'), shade: q('shade'),
       halo: q('halo'), candleImg: q<HTMLImageElement>('candleImg'), flameGlow: q('flameGlow'), flame: q('flame'),
       veil: q('veil'), seen: q('seen'), backBtn: q('backBtn'), favBtn: q('favBtn'),
-      favListBtn: q('favListBtn'), setBtn: q('setBtn'), toast: q('toast'), favPanel: q('favPanel'),
+      favListBtn: q('favListBtn'), setBtn: q('setBtn'), toast: q('toast'), favPanel: q('favPanel'), load: q('rload'),
     };
     this.el.veil.style.transition = 'opacity 1.4s ease';
     this.el.candleImg.addEventListener('error', () => { this.el.candleImg.style.display = 'none'; });
@@ -146,6 +147,8 @@ export class Reader {
 
     this.layout();
     addEventListener('resize', () => { this.layout(); this.draw(); this.placeRibbon(false); this.dustLayout(); });
+    // 別タブで印が変わったら取り込む（2026-09-26 QA D16）
+    addEventListener('storage', e => { if (e.key === null || e.key === 'bookexp-favs') { this.favs = loadFavs(); if (this.opened) this.updateFavUI(); } });
     this.dustLayout();
 
     this.bindInput();
@@ -193,14 +196,32 @@ export class Reader {
         if (b.seen) this.seenSet = new Set(b.seen);
       } else {
         // 栞が無い＝初期状態。開くたびに全ページを混ぜ直して最初から（2026-09-08 KEI「栞を外したらシャッフルに戻して」）
-        this.favMode = false; this.deck = this.shuffled(this.ALL_PAGES); this.index = 0;
+        // 合言葉の出現中に prime() で混ぜて先読みしてあれば、その並びを使う（2026-09-26 QA D14）
+        this.favMode = false; this.deck = this.primed ?? this.shuffled(this.ALL_PAGES); this.index = 0;
         this.seenSet = new Set(); this.flip = null; this.anim = null;
       }
       this.draw(); this.updateFavUI();
     }
+    this.primed = null;
     this.opened = true;
     this.uiWake();
     this.pump();
+    this.syncLoading();
+  }
+  /** 合言葉の出現演出（約10秒）の間に、最初の3枚を先読みしておく（2026-09-26 QA D14・KEI）。
+   *  既存の ensure() に乗せるだけ。開いた時は open() がこの並びを引き継ぐ。 */
+  prime(n = 3): void {
+    if (this.opened) return;
+    const b = loadBookmark();
+    let deck: number[], at = 0;
+    if (b && b.deck.every(x => x >= 0 && x < N)) { deck = b.deck; at = Math.min(b.index, deck.length - 1); }
+    else { deck = this.primed = this.primed ?? this.shuffled(this.ALL_PAGES); }
+    for (let d = 0; d < n && at + d < deck.length; d++) this.ensure(deck[at + d], true);
+  }
+  /** 「読み込み中」: いまのページ、またはめくり待ちのページがまだ届いていない間だけ出す */
+  private syncLoading(): void {
+    const need = this.opened && (!this.pg(this.index) || this.pendingFlip !== 0);
+    this.el.load.classList.toggle('show', need);
   }
   /** 闇からの夜明け：紙と背景は真っ黒から、ろうそくは0.4秒後に灯り、灯りは3.2秒かけて満ちる */
   private dawn(): void {
@@ -228,6 +249,7 @@ export class Reader {
   /** 完全に退場（シェルが本の画面に戻ったあと） */
   hide(): void {
     this.opened = false;
+    this.pendingFlip = 0; this.el.load.classList.remove('show');
     this.root.classList.remove('show', 'matchcut');
     this.cv.classList.remove('out', 'in', 'sway');
     this.glowBase = 0; this.lampLevel = 0;
@@ -263,6 +285,10 @@ export class Reader {
   }
   /** 読み込みに失敗した回数。2 回で諦める（無限リトライ防止・2026-09-09） */
   private failN = new Map<number, number>();
+  /** 合言葉の間に先読みした並び（open で引き継ぐ） */
+  private primed: number[] | null = null;
+  /** 画像が届く前にめくろうとした向き（届いたらめくる・0 = なし） */
+  private pendingFlip = 0;
   private static readonly RETRY_MAX = 2;
   private pageSrc(i: number): { src: string; fallback?: string } {
     return AVIF_OK ? { src: SRC_AVIF(i), fallback: SRC(i) } : { src: SRC(i) };
@@ -292,6 +318,14 @@ export class Reader {
       const k = this.deck.indexOf(i);
       if (k >= this.index - 1 && k <= this.index + 1) this.draw();
       if (i === this.deck[0] || i === this.deck[this.index]) this.firstReady();
+      // 未着のままスワイプされていたページが届いたら、そのままめくる（2026-09-26 QA D14）
+      const pf = this.pendingFlip;
+      if (pf && this.opened && !this.flip && !this.anim && !this.pd && this.pg(this.index + pf)) {
+        this.pendingFlip = 0;
+        this.grab.fy = 0.30; this.grab.dy = 0;
+        if (this.beginFlip(pf)) this.finishFlip(pf > 0 ? 1 : 0, true, 0.6);
+      }
+      this.syncLoading();
       this.pump();
     });
   }
@@ -748,7 +782,14 @@ export class Reader {
   private beginFlip(dir: number): boolean {
     if (dir > 0 && this.index >= this.deck.length - 1) return false;
     if (dir < 0 && this.index <= 0) return false;
-    if (!this.pg(this.index + (dir > 0 ? 1 : -1))) return false;
+    if (!this.pg(this.index + (dir > 0 ? 1 : -1))) {
+      // 画像がまだ無い: 黙って拒否せず「読み込み中」を出し、届いたらめくる（2026-09-26 QA D14）
+      this.pendingFlip = dir;
+      this.ensure(this.deck[this.index + dir], true);
+      this.syncLoading();
+      return false;
+    }
+    this.pendingFlip = 0;
     this.flip = { dir, t: dir > 0 ? 0 : 1 };
     return true;
   }
@@ -772,7 +813,7 @@ export class Reader {
         const turned = (dir > 0 && commitTo === 1) || (dir < 0 && commitTo === 0);
         if (dir > 0 && commitTo === 1) this.index++;
         if (dir < 0 && commitTo === 0) this.index--;
-        this.flip = null; this.anim = null; this.draw(); this.updateFavUI();
+        this.flip = null; this.anim = null; this.draw(); this.updateFavUI(); this.syncLoading();
         if (turned) { haptic(8); this.hooks.onFlip({ v: vel || 0, dir, seen: this.seenSet.size }); }
         // （着地後の紙の揺れ settle() は KEI 2026-09-04「ペラッペラで安っぽい」で不採用。関数は残置）
       }
@@ -866,6 +907,7 @@ export class Reader {
       if (performance.now() - this.uiJustWoke < 400) return;
       this.firstTouch();
       const p = this.deck[this.index];
+      this.favs = loadFavs();                    // 保存直前に読み直す（別タブの印を消さない・2026-09-26 QA D16）
       const i = this.favs.indexOf(p);
       if (i >= 0) { this.favs.splice(i, 1); sealSound(false); haptic(6); this.toast('印を外しました'); }
       else { this.favs.push(p); this.favStamp = { t0: performance.now() }; sealSound(true); haptic([10, 20, 15]); this.stampAnim(); this.toast('このページに印をつけました'); }
