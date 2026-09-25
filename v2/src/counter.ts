@@ -10,6 +10,7 @@
 //   - 通信はすべて try/catch ＋ 3秒でタイムアウト。落ちても本の動作には一切影響しない。
 //   - 数字の表示はルートの index.html（?stats）が受け持つ。本の中には何も出さない（2026-09-18 KEI）。
 // ============================================================
+import { isUnlocked } from './state';
 const BASE = 'https://abacus.jasoncameron.dev';
 // 本番（github.io）と手元の検証で名前空間を分ける。ローカルで試しても本番の数字は動かない
 const NS = /github\.io$/i.test(location.hostname) ? 'kei-meigen-book' : 'kei-meigen-book-test';
@@ -44,7 +45,7 @@ export function initCounter(): void {
   try {
     // ?stats はKEIが数字を見に来る画面。表示はルートの index.html が受け持つ（2026-09-18）。
     // ここへ直接来た場合も、数えない・何も出さない
-    if (new URLSearchParams(location.search).has('stats')) return;
+    if (new URLSearchParams(location.search).has('stats') && isUnlocked()) return;   // 解錠済みの時だけ（2026-09-25 QA）
     void bumpOnce();
   } catch { /* noop */ }
 }

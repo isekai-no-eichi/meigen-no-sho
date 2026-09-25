@@ -121,7 +121,8 @@ export function a2hsMark(): void { try { localStorage.setItem(K.a2hs, '1'); } ca
 
 // ---- 合言葉（初回だけのゲート・2026-09-21 KEI） ----
 /** 一度でも合言葉を通したか。通したあとは今までどおり本が最初から出る */
-export function isUnlocked(): boolean { try { return !!localStorage.getItem(K.unlocked); } catch { return true; } }
+// localStorage が読めない（throw）時は「解錠済み」と誤判定せず、ゲートを出す（2026-09-25 QA）
+export function isUnlocked(): boolean { try { return !!localStorage.getItem(K.unlocked); } catch { return false; } }
 export function markUnlocked(): void { try { localStorage.setItem(K.unlocked, '1'); } catch { /* noop */ } }
 
 // ---- 共通 ----

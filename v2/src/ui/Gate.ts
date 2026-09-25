@@ -5,7 +5,7 @@
 //     細い金の罫線の枠 →「合言葉は？」→ 下線だけの1行入力 →「ひらく」
 //   間違い: 枠ごと左右に小さく揺れ、「合言葉が違います」を1.5秒。
 //   正解  : 「解けた」一拍（0.5s）→ ゲート全体がフェード（1.2s）→ 本が出現（BookScene.revealStart）
-//   ?gate=1 で毎回出す（検証用）。?gate=0 のスキップは発売で廃止（2026-09-25）。?icon / ?stats には出さない。
+//   ?gate=1 で毎回出す（検証用）。?gate=0 のスキップは発売で廃止（2026-09-25）。クエリでゲートを飛ばす経路は無い（?icon / ?stats も未解錠ならゲートを出す・2026-09-25 QA）。
 // ============================================================
 import { QP, isUnlocked } from '../state';
 
@@ -50,7 +50,6 @@ export async function matchPassphrase(input: string): Promise<boolean> {
 const GATE_DEFAULT = true;
 
 export function gateNeeded(): boolean {
-  if (QP.has('icon') || QP.has('stats')) return false;    // 撮影モード・集計画面には出さない
   const g = QP.get('gate');
   if (g === '1') return true;                               // 検証用（解錠済みでも出す）
   // ?gate=0 のスキップは発売で廃止（誰でも URL に付けられるため・2026-09-25）

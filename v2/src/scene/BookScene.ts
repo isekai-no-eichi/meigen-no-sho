@@ -17,7 +17,7 @@ import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { asset, MOBILE, QP, BUILD, loadFavs, hasBookmark } from '../state';
+import { asset, MOBILE, QP, BUILD, loadFavs, hasBookmark, isUnlocked } from '../state';
 import { RoomBackground } from './RoomBackground';
 
 /** 表紙の箔押しタイトル「名言の書」。2026-09-08 KEI「チャチい」→ 無し。戻す時は true */
@@ -26,7 +26,7 @@ const QUALITY = !QP.has('classic');
 const CAM_R = 1.55;
 /** ?icon=1 … ホーム画面アイコン撮影用。本を直立させて正面から撮る（自転・部屋・栞・塵なし）。
  *  通常の閲覧には一切影響しない。角度は ?irx / ?iry / ?ith / ?iph / ?ir で微調整できる。 */
-const ICON = QP.has('icon');
+const ICON = QP.has('icon') && isUnlocked();   // 撮影モードは解錠済みの時だけ（2026-09-25 QA）
 const qn = (k: string, d: number): number => (QP.has(k) ? Number(QP.get(k)) : d);
 /** 撮影パラメータ。window.__icon で毎フレーム上書きできる（探索を速くするため。通常運転では未使用） */
 const iq = (k: string, d: number): number => {
