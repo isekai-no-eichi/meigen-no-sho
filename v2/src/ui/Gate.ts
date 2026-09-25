@@ -4,13 +4,15 @@
 //     本は出さない（scale 0）。背景・ロウソク・塵はそのまま。
 //     細い金の罫線の枠 →「合言葉は？」→ 下線だけの1行入力 →「ひらく」
 //   間違い: 枠ごと左右に小さく揺れ、「合言葉が違います」を1.5秒。
-//   正解  : 枠の縁を光が一周（0.9s）→ 枠が左右に割れて外へ（0.5s）→ 本が出現（BookScene.revealStart）
-//   ?gate=1 で毎回出す（検証用）／?gate=0 で強制スキップ。?icon / ?stats には出さない。
+//   正解  : 「解けた」一拍（0.5s）→ ゲート全体がフェード（1.2s）→ 本が出現（BookScene.revealStart）
+//   ?gate=1 で毎回出す（検証用）。?gate=0 のスキップは発売で廃止（2026-09-25）。?icon / ?stats には出さない。
 // ============================================================
 import { QP, isUnlocked } from '../state';
 
-/** 合言葉の正解。変える時はここ1か所だけ直す（2026-09-21 KEI） */
-export const PASSPHRASE = '？の美学';  // 2026-09-24 KEI 変更（旧: 答えより？の美学）
+/** 合言葉の正解は平文で置かない（2026-09-25 KEI GO・発売準備）。
+ *  値 = SHA-256( norm(合言葉) ) の hex。変える時は node で下の norm と同じ処理を通した文字列をハッシュして差し替える。
+ *  （例: node -e "…createHash('sha256').update(normした合言葉).digest('hex')"） */
+const PASSPHRASE_HASH = '53fac1b40bddfa94876e3b6929f70e318f00d889094506364b916c3cb3abc263';
 
 // ---- 演出の長さ（KEI の微調整はこの3つ。CSS へも変数で渡すので、ここを直せば見た目も揃う） ----
 // 2026-09-22 KEI「簡素に」: 枠の光の一周はやめ、枠は静かに消えるだけ。
@@ -28,20 +30,30 @@ function norm(s: string): string {
   v = v.replace(/️/g, '');                                     // 絵文字の異体字セレクタ
   return v;
 }
-/** 全角「？」・半角「?」のどちらも正解（NFKC で寄せる） */
-export function matchPassphrase(input: string): boolean {
-  return norm(input) !== '' && norm(input) === norm(PASSPHRASE);
+/** 全角「？」・半角「?」のどちらも正解（NFKC で寄せてから SHA-256 で照合） */
+export async function matchPassphrase(input: string): Promise<boolean> {
+  const v = norm(input);
+  if (v === '') return false;
+  try {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v));
+    const hex = Array.from(new Uint8Array(buf), b => b.toString(16).padStart(2, '0')).join('');
+    return hex === PASSPHRASE_HASH;
+  } catch (e) {
+    // crypto.subtle は https（または localhost）でしか使えない。http のローカル確認などで落ちた時
+    console.warn('[gate] crypto.subtle が使えないため照合できません（https で開いてください）', e);
+    return false;
+  }
 }
 
 /** この訪問で合言葉を出すか */
-/** 販売開始まで既定OFF（?gate=1 でのみ表示）。発売時に true へ（2026-09-21） */
-const GATE_DEFAULT = false;
+/** 発売モード（2026-09-25 KEI GO）: 未解錠なら毎回出す */
+const GATE_DEFAULT = true;
 
 export function gateNeeded(): boolean {
   if (QP.has('icon') || QP.has('stats')) return false;    // 撮影モード・集計画面には出さない
   const g = QP.get('gate');
-  if (g === '1') return true;
-  if (g === '0') return false;
+  if (g === '1') return true;                               // 検証用（解錠済みでも出す）
+  // ?gate=0 のスキップは発売で廃止（誰でも URL に付けられるため・2026-09-25）
   return GATE_DEFAULT && !isUnlocked();
 }
 
@@ -104,9 +116,14 @@ export class Gate {
     });
   }
 
-  private submit(): void {
+  private checking = false;                      // ハッシュ照合中の連打を無視
+  private async submit(): Promise<void> {
+    if (this.done || this.checking) return;
+    this.checking = true;
+    const ok = await matchPassphrase(this.input.value);
+    this.checking = false;
     if (this.done) return;
-    if (matchPassphrase(this.input.value)) { this.done = true; this.succeed(); }
+    if (ok) { this.done = true; this.succeed(); }
     else this.fail();
   }
 
