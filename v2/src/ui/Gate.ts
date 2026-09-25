@@ -14,8 +14,10 @@ export const PASSPHRASE = '？の美学';  // 2026-09-24 KEI 変更（旧: 答�
 
 // ---- 演出の長さ（KEI の微調整はこの3つ。CSS へも変数で渡すので、ここを直せば見た目も揃う） ----
 // 2026-09-22 KEI「簡素に」: 枠の光の一周はやめ、枠は静かに消えるだけ。
-const SWEEP_MS = 1800;     // 縁を光が一周してから割れる（2026-09-24 KEI 復活。0 = 出さない）
-const SPLIT_MS = 900;      // 枠が静かにフェードアウトする時間
+// 2026-09-25 KEI: 縁の光と割れは廃止 → 「解けた」一拍 → ゲート全体がフェード → 奥から本。
+const SWEEP_MS = 0;        // 0 = 縁を走る光を出さない
+const RELEASE_MS = 500;    // 「解けた」一拍（枠の内側がふっと明るくなり、わずかに緩む）
+const SPLIT_MS = 1200;     // ゲート全体（枠・文字・入力欄）がゆっくりフェードアウトする時間
 const ERR_MS = 1500;       // 「合言葉が違います」を出しておく時間
 
 function norm(s: string): string {
@@ -75,6 +77,7 @@ export class Gate {
     // 演出の長さは CSS にも渡す（定数はこのファイルだけが持つ）
     this.root.style.setProperty('--gsweep', SWEEP_MS + 'ms');
     this.root.style.setProperty('--gsplit', SPLIT_MS + 'ms');
+    this.root.style.setProperty('--grelease', RELEASE_MS + 'ms');
     document.body.appendChild(this.root);
     const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
     this.wrap = this.root.querySelector('.gwrap') as HTMLDivElement;
@@ -125,13 +128,13 @@ export class Gate {
     this.err.classList.remove('show');
     this.input.blur();
     this.input.disabled = true;
-    this.root.classList.add('ok');               // （SWEEP_MS > 0 の時だけ縁を光が走る）
+    this.root.classList.add('ok');               // 「解けた」一拍（内側がふっと明るく・わずかに緩む）
     setTimeout(() => {
-      this.root.classList.add('split');          // 枠が左右に割れる／中身が消える
+      this.root.classList.add('release');        // ゲート全体がゆっくりフェードアウト
       setTimeout(() => {
         this.root.classList.add('gone');
         this.onOpen();
       }, SPLIT_MS);
-    }, SWEEP_MS);
+    }, SWEEP_MS + RELEASE_MS);
   }
 }
