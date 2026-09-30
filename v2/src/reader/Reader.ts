@@ -91,6 +91,9 @@ export class Reader {
   private dawnTimer: ReturnType<typeof setTimeout> | null = null;
   private uiJustWoke = 0;
   private ribbonShown = false;
+  // 夜明けの間は栞を出さずに待たせる（2026-09-30 KEI 実機: 紙がまだ闇の中なのに栞だけ先に浮いていた）
+  private ribbonHold = false; private ribbonWant = false;
+  private ribbonTimer: ReturnType<typeof setTimeout> | null = null;
   private candleOn = false;
   private _toastT: ReturnType<typeof setTimeout> | null = null;
   private opened = false;
@@ -184,6 +187,7 @@ export class Reader {
     // 旧: show を付けた後に uihide を setTimeout(0) で足していたため、その間の1フレームに opacity .92 で描かれていた。
     //     → show より先に同期で uihide＋dawning（visibility:hidden）を付け、ボタンは uiWake(6.8s) の1回だけ出す。
     if (dawn) this.root.classList.add('uihide', 'dawning');
+    if (dawn) { this.ribbonHold = true; this.ribbonWant = false; }   // 栞は紙が闇から浮かんでから（dawn() の RIB_DAWN_MS）
     this.root.classList.add('show');
     this.cv.classList.add('in'); this.cv.classList.add('sway');
     if (dawn) this.dawn(); else this.rampGlow(1.0, mc ? 1100 : 3600);
@@ -243,6 +247,13 @@ export class Reader {
       dark.forEach(el => { el.style.transition = 'filter 5s ease-in-out'; el.style.filter = ''; });
       setTimeout(() => { dark.forEach(el => { el.style.transition = ''; }); c.style.transition = ''; }, 5200);
     }, 1500);
+    // 栞は紙が闇から浮かび上がってから、その場でじゅわっと出す（2026-09-30 KEI「本の中に入った時に出してほしい」）
+    if (this.ribbonTimer) clearTimeout(this.ribbonTimer);
+    this.ribbonTimer = setTimeout(() => {
+      this.ribbonTimer = null;
+      this.ribbonHold = false;
+      if (this.opened && this.ribbonWant) this.showRibbon(false);
+    }, Reader.RIB_DAWN_MS);
     if (this.dawnTimer) clearTimeout(this.dawnTimer);
     this.dawnTimer = setTimeout(() => {
       this.dawnTimer = null;
@@ -264,6 +275,8 @@ export class Reader {
     this.pendingFlip = 0; this.el.load.classList.remove('show');
     this.root.classList.remove('show', 'matchcut', 'dawning');
     if (this.dawnTimer) { clearTimeout(this.dawnTimer); this.dawnTimer = null; }
+    if (this.ribbonTimer) { clearTimeout(this.ribbonTimer); this.ribbonTimer = null; }
+    this.ribbonHold = false; this.ribbonWant = false;
     this.cv.classList.remove('out', 'in', 'sway');
     this.glowBase = 0; this.lampLevel = 0;
     this.el.paperGlow.style.opacity = '0';
@@ -353,6 +366,8 @@ export class Reader {
   // bookmark.webp は 400x1805。上端 RIB_PEEK 分（麻紐＋マーク）だけを紙の上端から覗かせる。
   private static readonly RIB_AR = 1805 / 400;
   private static readonly RIB_PEEK = 0.215;
+  // 夜明けで紙が見えてくる（1.5s から 5s かけて）のを待って栞を出す。4.6s ≒ 紙が7〜8割見えた所
+  private static readonly RIB_DAWN_MS = 4600;
   private ribbonGeom(): { w: number; h: number; left: number; top: number } {
     const r = this.cv.getBoundingClientRect();
     const w = Math.round(Math.min(58, Math.max(34, r.width * 0.13)));
@@ -377,6 +392,7 @@ export class Reader {
     }
   }
   private showRibbon(animate: boolean): void {
+    if (this.ribbonHold) { this.ribbonWant = true; return; }   // 夜明けの間は出さず、出す予約だけ
     if (this.ribbonShown && !animate) return;
     this.ribbonShown = true; this.placeRibbon(animate);
     if (!animate) {
@@ -388,6 +404,7 @@ export class Reader {
     }
   }
   private hideRibbon(animate = false): void {
+    this.ribbonWant = false;
     if (!this.ribbonShown) return;
     this.ribbonShown = false;
     const el = this.el.ribbon;
