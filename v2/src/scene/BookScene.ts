@@ -494,15 +494,21 @@ export class BookScene {
     const favs = loadFavs();
     if (!favs.length) return;
     const bb = this.bookBB;
+    // 2026-09-30 KEI「ページの所々に何かはみ出てる」: 以前は本全体の外枠（表紙の縁 max.x）の外に置いていたため、
+    // 小口より約5mm手前に金の小片が宙に浮いて見えていた。紙の束（Pages_*）の小口に半分埋めて挟み込む。
+    const pb = this.pagesBox() || bb;
     this.favMarks = new THREE.Group();
     const bw = bb.max.x - bb.min.x, by = bb.max.y - bb.min.y, bz = bb.max.z - bb.min.z;
+    const py = pb.max.y - pb.min.y, pz = pb.max.z - pb.min.z;
     const mat = new THREE.MeshStandardMaterial({ color: 0xd9b25a, roughness: 0.35, metalness: 0.7, emissive: 0x3a2a08 });
-    const geo = new THREE.BoxGeometry(bw * 0.012, Math.max(0.0006, by * 0.006), bz * 0.028);
+    const dx = bw * 0.012;
+    const geo = new THREE.BoxGeometry(dx, Math.max(0.0006, by * 0.006), bz * 0.028);
     favs.slice(0, 80).forEach((p, i) => {
       const m = new THREE.Mesh(geo, mat);
       const k = (p % 790) / 790;
-      const z = bb.max.z - bz * (0.12 + ((i * 0.618) % 1) * 0.76);
-      m.position.set(bb.max.x + bw * 0.003, bb.min.y + by * (0.18 + k * 0.64), z);
+      const z = pb.max.z - pz * (0.12 + ((i * 0.618) % 1) * 0.76);
+      // 小口から 1/3 だけ覗かせる（表紙の張り出しより内側に収まる）
+      m.position.set(pb.max.x + dx * (1 / 3 - 0.5), pb.min.y + py * (0.15 + k * 0.70), z);
       this.favMarks!.add(m);
     });
     this.book.add(this.favMarks);
@@ -510,6 +516,21 @@ export class BookScene {
 
   get ribbonMesh(): THREE.Mesh | null { return this.ribbon; }
   setRibbonVisible(v: boolean): void { if (this.ribbon) this.ribbon.visible = v; }
+  /** 紙の束（Pages_*）の外枠を本のローカル座標で返す（pivot の縮尺・本の傾きに左右されない） */
+  private pagesBox(): THREE.Box3 | null {
+    const book = this.book; if (!book) return null;
+    book.updateMatrixWorld(true);
+    const inv = book.matrixWorld.clone().invert();
+    const out = new THREE.Box3(), tmp = new THREE.Box3(), m = new THREE.Matrix4();
+    book.traverse(o => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh || !/^Pages/.test(mesh.name)) return;
+      mesh.geometry.computeBoundingBox();
+      tmp.copy(mesh.geometry.boundingBox!).applyMatrix4(m.multiplyMatrices(inv, mesh.matrixWorld));
+      out.union(tmp);
+    });
+    return out.isEmpty() ? null : out;
+  }
   refreshRibbon(): void { if (this.ribbon) this.ribbon.visible = hasBookmark(); }
 
   // ---- 吸い込みの光の粒 ----
