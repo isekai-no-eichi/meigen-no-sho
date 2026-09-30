@@ -325,10 +325,14 @@ body.land-block.stage-book #ui,body.land-block.stage-book #hint{visibility:hidde
 #gate .gin{position:relative;z-index:1;transition:opacity .7s ease}
 #gate .gq{font-family:var(--serif);font-size:clamp(14px,4vmin,18px);letter-spacing:.26em;text-indent:.26em;color:var(--gold2);
   text-shadow:0 1px 2px #000,0 0 12px rgba(0,0,0,.8);margin:0 0 20px}
-#gate input{display:block;width:100%;box-sizing:border-box;margin:0 auto;padding:6px 2px 8px;text-align:center;
-  font-family:var(--serif);font-size:clamp(17px,5vmin,22px);letter-spacing:.2em;text-indent:.2em;color:#ffe2ba;
+/* 入力欄は contenteditable の div（iOS の連絡先・住所の自動入力を避ける・2026-09-30）。見た目は旧 input と同じ */
+#gate .gfield{display:block;width:100%;box-sizing:border-box;margin:0 auto;padding:6px 2px 8px;text-align:center;
+  font-family:var(--serif);font-size:clamp(17px,5vmin,22px);letter-spacing:.2em;text-indent:.2em;color:#ffe2ba;caret-color:#ffe2ba;
+  line-height:1.25;min-height:calc(1.25em + 14px);white-space:nowrap;overflow:hidden;cursor:text;
+  -webkit-user-select:text;user-select:text;-webkit-tap-highlight-color:transparent;
   background:none;border:none;border-bottom:1px solid rgba(216,196,138,.5);border-radius:0;outline:none;-webkit-appearance:none}
-#gate input:focus{border-bottom-color:rgba(255,226,186,.9)}
+#gate .gfield:focus{border-bottom-color:rgba(255,226,186,.9)}
+#gate .gfield br{display:none}
 #gate .gbtn{display:block;margin:18px auto 0;background:none;border:none;cursor:pointer;
   font-family:var(--serif);font-size:clamp(13px,3.8vmin,16px);letter-spacing:.34em;text-indent:.34em;color:var(--gold2);
   padding:6px 10px;transition:color .18s ease}

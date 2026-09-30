@@ -60,7 +60,8 @@ export function gateNeeded(): boolean {
 export class Gate {
   private root: HTMLDivElement;
   private wrap!: HTMLDivElement;
-  private input!: HTMLInputElement;
+  /** 入力欄は contenteditable の div（2026-09-30 KEI: <input> だと iOS が住所欄と推定して連絡先の自動入力候補を出すため） */
+  private input!: HTMLDivElement;
   private err!: HTMLElement;
   private errTimer: ReturnType<typeof setTimeout> | null = null;
   private done = false;
@@ -78,7 +79,7 @@ export class Gate {
     <div class="gin">
       <div class="gq">合言葉は？</div>
       <form id="gateForm" action="#" autocomplete="off">
-      <input id="gateInput" type="text" name="pass" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="go" aria-label="合言葉">
+      <div id="k7x" class="gfield" role="textbox" aria-label="合言葉" aria-multiline="false" tabindex="0" contenteditable="true" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" inputmode="text" enterkeyhint="go"></div>
       <div class="gerr" id="gateErr">合言葉が違います</div>
       <button class="gbtn" id="gateGo" type="submit">ひらく</button>
       </form>
@@ -93,8 +94,26 @@ export class Gate {
     document.body.appendChild(this.root);
     const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
     this.wrap = this.root.querySelector('.gwrap') as HTMLDivElement;
-    this.input = $<HTMLInputElement>('gateInput');
+    this.input = $<HTMLDivElement>('k7x');
     this.err = $('gateErr');
+    // 書式なしの編集（対応ブラウザだけ。未対応は "true" のまま・貼り付けは下で文字だけにする）
+    try { this.input.contentEditable = 'plaintext-only'; } catch { /* 未対応 */ }
+    if (this.input.contentEditable !== 'plaintext-only') this.input.contentEditable = 'true';
+    // 改行を入れない（Enter は送信に使う・iOS の「go」も insertParagraph で来る）
+    this.input.addEventListener('beforeinput', (e: InputEvent) => {
+      if (e.inputType === 'insertParagraph' || e.inputType === 'insertLineBreak') e.preventDefault();
+    });
+    // 貼り付けは文字だけ・1行に
+    this.input.addEventListener('paste', (e: ClipboardEvent) => {
+      e.preventDefault();
+      const t = (e.clipboardData?.getData('text/plain') || '').replace(/[\r\n]+/g, ' ');
+      if (t) document.execCommand('insertText', false, t);
+    });
+    // 全部消した時に残る <br> などを掃除（:empty の案内文・高さを保つ）。変換中は触らない
+    this.input.addEventListener('input', (e: Event) => {
+      if ((e as InputEvent).isComposing) return;
+      if (this.input.textContent === '' && this.input.childNodes.length) this.input.textContent = '';
+    });
 
     // iOS のキーボード「go」/ Enter は form の submit で受ける（IME の確定と二重にならない）
     $('gateForm').addEventListener('submit', (e: Event) => { e.preventDefault(); this.submit(); });
@@ -120,7 +139,7 @@ export class Gate {
   private async submit(): Promise<void> {
     if (this.done || this.checking) return;
     this.checking = true;
-    const ok = await matchPassphrase(this.input.value);
+    const ok = await matchPassphrase(this.input.textContent || '');
     this.checking = false;
     if (this.done) return;
     if (ok) { this.done = true; this.succeed(); }
@@ -129,10 +148,10 @@ export class Gate {
 
   private fail(): void {
     if (QP.get('dbg') === '1') {                 // ?gate=1&dbg=1: 入力の文字コードを表示（実機の調査用）
-      const cps = Array.from(this.input.value).map(c => c.codePointAt(0)!.toString(16)).join(' ');
+      const cps = Array.from(this.input.textContent || '').map(c => c.codePointAt(0)!.toString(16)).join(' ');
       this.err.textContent = '合言葉が違います [' + cps + ']';
     }
-    this.input.value = '';
+    this.input.textContent = '';
     this.wrap.classList.remove('shake');
     void this.wrap.offsetWidth;                  // アニメーションを巻き戻す
     this.wrap.classList.add('shake');
@@ -144,7 +163,7 @@ export class Gate {
   private succeed(): void {
     this.err.classList.remove('show');
     this.input.blur();
-    this.input.disabled = true;
+    this.input.contentEditable = 'false';
     this.root.classList.add('ok');               // 「解けた」一拍（内側がふっと明るく・わずかに緩む）
     setTimeout(() => {
       this.root.classList.add('release');        // ゲート全体がゆっくりフェードアウト
