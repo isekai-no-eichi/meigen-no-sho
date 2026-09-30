@@ -193,6 +193,31 @@ export function uiClick(k = 1): void {
   const lp = sx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900; lp.Q.value = 0.7;
   const g2 = sx.createGain(); g2.gain.value = 0.05 * k; n.connect(lp); lp.connect(g2); g2.connect(sxMaster); n.start(t0);
 }
+/**
+ * 押下音（2026-09-30 KEI「ボタンを押しても音がないから寂しい」）。
+ * 文字ボタン全部で同じ、小さく短い柔らかい「コッ」（約60ms・ピーク -20dB）。蝋燭・虫の声と同じく WebAudio で合成。
+ * 音OFFの時は何もしない（AudioContext にも触らない・v36 の設計のまま）。
+ */
+let tapCount = 0;
+export function tapSound(): void {
+  if (!S.sound) return;
+  if (!sx) sxInit();
+  if (!sx || !sxMaster) return;
+  tapCount++;
+  try {
+    const t0 = sx.currentTime;
+    const o = sx.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(980, t0); o.frequency.exponentialRampToValueAtTime(520, t0 + 0.045);
+    const g = sx.createGain();
+    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.10, t0 + 0.003); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.06);
+    o.connect(g); g.connect(sxMaster); o.start(t0); o.stop(t0 + 0.07);
+    const nb = noiseBuffer(0.02, x => Math.pow(1 - x, 4)); if (!nb) return;
+    const n = sx.createBufferSource(); n.buffer = nb;
+    const bp = sx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2200; bp.Q.value = 1.1;
+    const g2 = sx.createGain(); g2.gain.value = 0.05;
+    n.connect(bp); bp.connect(g2); g2.connect(sxMaster); n.start(t0);
+  } catch { /* noop */ }
+}
 /** 低いノイズのうねり（共通部品） */
 function darkSwell(t0: number, dur: number, gain: number, f0: number, f1: number, attack: number, release: number): void {
   if (!sx || !sxMaster) return;
@@ -427,7 +452,7 @@ export function toggleSound(): void {
     audioOn = false; ensureAudio();
     if (sx && sx.state !== 'running') sx.resume().catch(() => {});
     setRainVol(rainTarget()); rain.play().catch(() => {});
-    uiClick(1);
+    tapSound();                                             // 押下音で統一（2026-09-30）
   } else {
     try { rain.pause(); } catch { /* noop */ }
     decks.forEach(d => { try { d.pause(); } catch { /* noop */ } });
@@ -440,6 +465,13 @@ export function haptic(p: number | number[]): void { try { if (navigator.vibrate
 
 export function initAudioGlobalHooks(): void {
   applySoundFlags();
+  // 押下音: ユーザーが押す文字ボタン（button / role=button）全部に同じ音を1つ（2026-09-30 KEI）。
+  // capture で拾うので、各ボタンの処理（音の入切を含む）より先に鳴る。音OFFなら tapSound が何もしない
+  document.addEventListener('click', e => {
+    const t = e.target as Element | null;
+    const b = t && t.closest ? t.closest('button, [role="button"]') as HTMLButtonElement | null : null;
+    if (b && !b.disabled) tapSound();
+  }, true);
   (['pointerdown', 'touchend', 'click', 'keydown'] as const).forEach(ev => addEventListener(ev, ensureAudio, { passive: true }));
   (['touchend', 'click', 'pointerup'] as const).forEach(ev => addEventListener(ev, () => {
     if (!S.sound) return;
@@ -454,5 +486,5 @@ export function initAudioGlobalHooks(): void {
 
 export const audioDebug = () => ({
   audioOn, routed, sxState: sx && sx.state, rainV: _rainV, deckV,
-  flipBufs: flipBufs.filter(Boolean).length, pageBuf: !!pageBuf,
+  flipBufs: flipBufs.filter(Boolean).length, pageBuf: !!pageBuf, taps: tapCount,
 });

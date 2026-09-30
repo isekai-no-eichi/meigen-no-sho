@@ -2,14 +2,40 @@
 // 本の画面のUI
 //   下は縦1列（2026-09-17 KEI）: 上から
 //     「この本の説明」  … 常時表示
-//     「しおりから読む」「しおりを外す」 … しおりが1本でもある時だけ
+//     「栞から読む」｜「栞を外す」 … しおりが1本でもある時だけ（2026-09-30 KEI: 漢字にして1行に左右で並べる）
 //     「お気に入りを読む」            … お気に入りが1枚でもある時だけ
 //   （2026-09-13 の「常時表示＋一言」は撤回。KEI: 入れた瞬間にボタンが増える形へ）
 //   - 表示から2秒後、画面中央に細い金の罫線1本と一文「2回タップで、本を読む」
 //   - 本を開くのはダブルタップ（400ms以内の2回）だけ。1回タップは何もしない。PC は Enter / Space でも開く
 //   - 「この本の説明」= 羊皮紙の手紙（2026-09-17 KEI・黒革をやめた）。縦スクロール＋3ページ送り
 // ============================================================
-import { hasBookmark, favCount, clearBookmark, a2hsSeen, a2hsMark } from '../state';
+import { hasBookmark, favCount, clearBookmark, a2hsSeen, a2hsMark, asset } from '../state';
+
+// ---- 枠・札の画像の先読み（2026-09-30 KEI「文字が出た後に、画像のフレームが表示されるのが気になる」） ----
+//   CSS の border-image / background は、その要素が初めて描かれる時に読み込みが始まる。
+//   そのため「この本の説明」を初めて開くと、文字が先に出て黒革の枠（panel.webp）が遅れて出ていた。
+//   起動時に3枚を読み込み＋デコードしておき、終わるまでは枠を使う要素を描かない（styles.css の body:not(.uiimg)）。
+const UI_IMGS = ['ui2/panel.webp', 'ui2/button.webp', 'ui2/small.png'];
+const uiImgKeep: HTMLImageElement[] = [];   // デコード済みの画像を手放さない
+function preloadUiImages(): void {
+  const t0 = performance.now();
+  const log: Array<{ img: string; ms: number }> = [];
+  (window as unknown as { __uiImgLog: unknown }).__uiImgLog = log;
+  const ready = () => {
+    if (document.body.classList.contains('uiimg')) return;
+    document.body.classList.add('uiimg');
+    log.push({ img: 'ALL', ms: Math.round(performance.now() - t0) });
+    console.log('uiimg ready', JSON.stringify(log));
+  };
+  Promise.all(UI_IMGS.map(p => new Promise<void>(res => {
+    const im = new Image(); uiImgKeep.push(im);
+    const done = () => { log.push({ img: p, ms: Math.round(performance.now() - t0) }); res(); };
+    im.onload = () => { (im.decode ? im.decode() : Promise.resolve()).catch(() => {}).then(done); };
+    im.onerror = done;
+    im.src = asset(p);
+  }))).then(ready);
+  setTimeout(ready, 8000);                    // 保険: 回線が詰まっても UI が永久に出ないことはない
+}
 
 const HINT_DELAY = 2000;
 const DOUBLE_TAP = 400;   // 2026-09-09 KEI: 2回タップの猶予を広げる
@@ -27,6 +53,7 @@ export class Ui {
   private ui: HTMLDivElement;
   private menu: HTMLDivElement;
   private a2hs: HTMLDivElement;
+  private bmRow!: HTMLDivElement;
   private bResume!: HTMLButtonElement;
   private bClearBm!: HTMLButtonElement;
   private bFav!: HTMLButtonElement;
@@ -39,14 +66,17 @@ export class Ui {
   private locked = false;                       // 開く演出中・読書中は反応しない
 
   constructor(private hooks: UiHooks) {
+    preloadUiImages();
     const wrap = document.createElement('div');
     wrap.innerHTML = `
 <div id="hint"><div class="rule"></div><div class="txt">2回タップで、本を読む</div></div>
 <div id="landMsg">縦にしてください</div>
 <div id="ui">
   <button class="seal wide" id="bInfo">この本の説明</button>
-  <button class="seal wide" id="bResume" aria-label="しおりから読む" hidden>しおりから読む</button>
-  <button class="seal wide" id="bClearBm" aria-label="しおりを外す" hidden>しおりを外す</button>
+  <div class="bmrow" id="bmRow" hidden>
+    <button class="seal wide" id="bResume" aria-label="栞から読む" hidden>栞から読む</button>
+    <button class="seal wide" id="bClearBm" aria-label="栞を外す" hidden>栞を外す</button>
+  </div>
   <button class="seal wide" id="bFav" aria-label="お気に入りを読む" hidden>お気に入りを読む</button>
 </div>
 <div id="a2hs"><span>ホーム画面に追加すると、枠のない全画面で読める</span><button id="a2hsX" aria-label="閉じる">✕</button></div>
@@ -65,8 +95,8 @@ export class Ui {
   <div class="tab" data-tab="1" hidden>
     <p class="h">しおり</p>
     <p>途中で本を閉じたいときは、<br>画面の下にある<span class="k">【栞】</span>を押す。</p>
-    <p>そのページに栞が挟まり、<br>次からは最初の画面にある<span class="k">【しおりから読む】</span>から続きを読めるようになる。</p>
-    <p>最初の画面にある<span class="k">【しおりを外す】</span>を押せば、<br>挟んでいた栞を外すことができる。</p>
+    <p>そのページに栞が挟まり、<br>次からは最初の画面にある<span class="k">【栞から読む】</span>から続きを読めるようになる。</p>
+    <p>最初の画面にある<span class="k">【栞を外す】</span>を押せば、<br>挟んでいた栞を外すことができる。</p>
     <p class="last">その後は、また本を開くたびに名言の順番が変わる。</p>
   </div>
   <div class="tab" data-tab="2" hidden>
@@ -105,6 +135,7 @@ export class Ui {
     this.menu.addEventListener('click', e => { if (e.target === this.menu) this.closeMenu(); });
     $('tabPrev').addEventListener('click', () => this.showTab(this.tabIdx - 1));
     $('tabNext').addEventListener('click', () => this.showTab(this.tabIdx + 1));
+    this.bmRow = $<HTMLDivElement>('bmRow');
     this.bResume = $<HTMLButtonElement>('bResume');
     this.bClearBm = $<HTMLButtonElement>('bClearBm');
     this.bFav = $<HTMLButtonElement>('bFav');
@@ -143,11 +174,12 @@ export class Ui {
   /**
    * 入口ボタンの出し入れ（2026-09-17 KEI）。
    *   「この本の説明」は常時。
-   *   「しおりから読む」「しおりを外す」はしおりが1本でもある時だけ。
+   *   「栞から読む」「栞を外す」はしおりが1本でもある時だけ（同じ1行に左右で並ぶ・2026-09-30）。
    *   「お気に入りを読む」はお気に入りが1枚でもある時だけ。
    */
   updateEntry(): void {
     const bm = hasBookmark();
+    this.bmRow.hidden = !bm;
     this.bResume.hidden = !bm;
     this.bClearBm.hidden = !bm;
     this.bFav.hidden = favCount() === 0;

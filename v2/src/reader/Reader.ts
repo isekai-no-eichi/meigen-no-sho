@@ -9,7 +9,7 @@
 //    - finishFlip の dur / イージング / commitTo のしきい値
 // ============================================================
 import { asset, MOBILE, QP, S, loadFavs, saveFavs, loadBookmark, saveBookmark, clearBookmark, bookmarkPages, removeBookmarkPage, type Bookmark } from '../state';
-import { pageSound, sealSound, ribbonSound, uiClick, haptic, ensureAudio } from '../audio';
+import { pageSound, sealSound, ribbonSound, haptic, ensureAudio } from '../audio';
 
 const N = 790;
 // 名言のページは AVIF（900x1200 q52・1枚 297KB → 約150KB）。
@@ -948,9 +948,10 @@ export class Reader {
       this.showRibbon(true); ribbonSound(); haptic([10, 20, 15]);
       this.el.favListBtn.classList.add('on'); this.hooks.onBookmark({ off: false });
     });
-    this.el.setBtn.addEventListener('click', () => { ensureAudio(); uiClick(); this.hooks.onSoundToggle(); });
-    this.el.backBtn.addEventListener('click', () => { ensureAudio(); uiClick(); this.hooks.onClose(); });
-    this.root.querySelector('#favClose')!.addEventListener('click', () => { ensureAudio(); uiClick(); this.el.favPanel.style.display = 'none'; });
+    // 押下音は audio の共通フック（tapSound）が鳴らす（2026-09-30 KEI: 全ボタン同じ音に統一）
+    this.el.setBtn.addEventListener('click', () => { ensureAudio(); this.hooks.onSoundToggle(); });
+    this.el.backBtn.addEventListener('click', () => { ensureAudio(); this.hooks.onClose(); });
+    this.root.querySelector('#favClose')!.addEventListener('click', () => { ensureAudio(); this.el.favPanel.style.display = 'none'; });
   }
   private firstTouch(): void {
     ensureAudio();

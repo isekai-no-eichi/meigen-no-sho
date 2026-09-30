@@ -34,6 +34,14 @@ const iq = (k: string, d: number): number => {
   if (w && typeof w[k] === 'number') return w[k];
   return qn(k, d);
 };
+/**
+ * 3Dの本の大きさ（2026-09-30 KEI「今若干大きすぎる」→ 90%）。pivot ごと縮める（栞・印・机の影も一緒）。
+ * 縦画面の背景の「引き」（RoomBackground・aspect<0.72）はカメラ側なので触らない。
+ * 潜り（dive）の終わりと、閉じる時の抜け始めは、カメラも本の中心へ同じ比率で寄せて
+ * 読書画面とのマッチカットの見え方を 100% の時と同じに保つ（similarity: 本も視点も同じ比率なら像は同じ）。
+ * ?bs=1 で旧サイズ。アイコン撮影（?icon=1）は対象外。
+ */
+const BOOK_SIZE = ICON ? 1 : qn('bs', 0.9);
 const CANDLE_I = QUALITY ? 1.55 : 1.3;   // 2026-09-09 KEI: 右下の光が強い→半減
 const DIVE_DUR = 1.6;                     // ページの間へ潜る時間（秒）
 /** 開く演出の光の強さの係数。2026-09-07 KEI: 光が強すぎる→半分 */
@@ -684,7 +692,7 @@ export class BookScene {
   update(opts: {
     dt: number; wdt: number; t: number; raw: number;
     dragging: boolean; opening: boolean; diving: boolean; diveT: number;
-    autoSpin: boolean; camOverride: { r: number; ph: number } | null;
+    autoSpin: boolean; camOverride: { r: number; ph: number; near?: number } | null;
   }): void {
     if (this.composer && !this.perfDone) {
       this.perfN++; this.perfT += opts.raw;
@@ -704,7 +712,7 @@ export class BookScene {
 
     if (this.revealT >= 0 || this.glowT >= 0 || this.bursts.some(b => b.t >= 0)) this.revealStep(wdt);
     else this.bookScale += (this.bookTarget - this.bookScale) * (1 - Math.exp(-wdt / 0.28));
-    this.pivot.scale.setScalar(Math.max(0.0001, this.bookScale));
+    this.pivot.scale.setScalar(Math.max(0.0001, this.bookScale) * BOOK_SIZE);
     this.pivot.position.y = 0.10 + Math.sin(t * 0.9) * 0.008;
     if (this.revealBack > 0) {
       // カメラから本へ向かう向きの逆＝「奥」。出現中だけ、その分だけ退かせる
@@ -811,14 +819,14 @@ export class BookScene {
       // 潜りは「表紙が開く間に寄せた距離」(CAM_R-0.26) から始める。CAM_R から始めると一瞬引いてガクッとなる（2026-09-07 夜 KEI指摘）
       const r = (CAM_R - 0.26) * (1 - e2) + 0.155 * e2, th = this.camTheta, ph = this.camPhi * (1 - e2) + 0.12 * e2;
       cam.position.set(r * Math.sin(ph) * Math.sin(th), r * Math.cos(ph), r * Math.sin(ph) * Math.cos(th));
-      cam.lookAt(0, 0.01, 0);
+      this.nearLook(e2, 0.01);
       // 本の中へ潜るほど視野が広がる（覗き込む歪み）
       const fov = 38 + 20 * (k * k);
       if (Math.abs(cam.fov - fov) > 0.05) { cam.fov = fov; cam.updateProjectionMatrix(); }
     } else if (opts.camOverride) {
       const { r, ph } = opts.camOverride, th = this.camTheta;
       cam.position.set(r * Math.sin(ph) * Math.sin(th), r * Math.cos(ph), r * Math.sin(ph) * Math.cos(th));
-      cam.lookAt(0, 0.01, 0);
+      this.nearLook(opts.camOverride.near || 0, 0.01);
     } else {
       const hx = QUALITY ? Math.sin(t * 0.37) * 0.004 + Math.sin(t * 0.91 + 1.0) * 0.002 : 0;
       const hy = QUALITY ? Math.sin(t * 0.53 + 1.0) * 0.003 : 0;
@@ -841,6 +849,19 @@ export class BookScene {
     }
   }
 
+  /**
+   * カメラを本の中心（pivot）へ BOOK_SIZE の比率で寄せてから注視する。near=0 で従来どおり、near=1 で完全に比率どおり。
+   * 本を縮めても、潜りの終わり（読書画面へのマッチカット）の見え方が変わらないようにするため。
+   */
+  private nearLook(near: number, ty: number): void {
+    const cam = this.camera;
+    const f = 1 - (1 - BOOK_SIZE) * Math.max(0, Math.min(1, near));
+    if (f === 1) { cam.lookAt(0, ty, 0); return; }
+    const P = this.pivot.position;
+    cam.position.set(P.x + (cam.position.x - P.x) * f, P.y + (cam.position.y - P.y) * f, P.z + (cam.position.z - P.z) * f);
+    cam.lookAt(P.x + (0 - P.x) * f, P.y + (ty - P.y) * f, P.z + (0 - P.z) * f);
+  }
+
   /** 開く演出が終わったら描画設定を平常へ戻す */
   resetOpenFX(): void {
     if (this.camera.fov !== 38) { this.camera.fov = 38; this.camera.updateProjectionMatrix(); }
@@ -854,6 +875,7 @@ export class BookScene {
   }
 
   static readonly CAM_R = CAM_R;
+  static readonly BOOK_SIZE = BOOK_SIZE;
   static readonly DIVE_DUR = DIVE_DUR;
   static readonly QUALITY = QUALITY;
 }

@@ -372,12 +372,13 @@ scene.renderer.setAnimationLoop(() => {
   if (diving) diveT += wdt;
 
   // 本を閉じる儀式: 本から抜ける(1.0s) → 表紙が重く閉じる(0.85s) → ドスッ
-  let closeCam: { r: number; ph: number } | null = openEnvelope();
+  let closeCam: { r: number; ph: number; near?: number } | null = openEnvelope();
   if (closing && scene.hinge) {
     closing.t += wdt;
     if (closing.phase === 'pull') {
       const k = Math.min(closing.t / 1.0, 1), e2 = 1 - Math.pow(1 - k, 3);
-      closeCam = { r: 0.19 + (BookScene.CAM_R - 0.19) * e2, ph: 0.12 + (scene.camPhi - 0.12) * e2 };
+      // near: 抜け始めは本の縮尺（BOOK_SIZE）に合わせて寄せ、抜け切ったら通常の距離へ（2026-09-30 本90%）
+      closeCam = { r: 0.19 + (BookScene.CAM_R - 0.19) * e2, ph: 0.12 + (scene.camPhi - 0.12) * e2, near: 1 - e2 };
       scene.hinge.rotation.z = 2.5;
       if (k >= 1) closing = { phase: 'shut', t: 0 };
     } else if (closing.phase === 'shut') {

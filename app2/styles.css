@@ -70,6 +70,16 @@ body.land-block.stage-book #ui,body.land-block.stage-book #hint{visibility:hidde
   font-size:clamp(13px,3.6vw,16px);letter-spacing:.08em;text-indent:.08em;
   border-width:10px;border-image-width:10px}
 .seal[hidden]{display:none}
+/* 「栞から読む」｜「栞を外す」を1行に左右で並べる（2026-09-30 KEI: 下のUIの圧迫を減らす）。幅は他の行と同じ */
+.bmrow{display:flex;gap:10px;width:min(78vw,320px);flex:0 0 auto}
+.bmrow[hidden]{display:none}
+.bmrow .seal.wide{flex:1 1 0;width:auto;letter-spacing:.04em;text-indent:.04em}
+/* 枠・札の画像（panel / button / small）が読み終わるまで、それを使う要素は描かない。
+   文字だけ先に出て、枠が遅れて出るのを防ぐ（2026-09-30 KEI）。ui/Ui.ts の preloadUiImages が body.uiimg を付ける */
+body:not(.uiimg) #ui,body:not(.uiimg) #menu .frame,body:not(.uiimg) #favBtn,body:not(.uiimg) #favListBtn,body:not(.uiimg) #setBtn{visibility:hidden}
+/* 説明パネルは文字と枠を一緒にふわっと出す */
+#menu.show .frame{animation:frameIn .28s ease-out}
+@keyframes frameIn{from{opacity:0}to{opacity:1}}
 .ico.off{opacity:.55}
 .ico{font-family:var(--ui);font-size:var(--t-sm);letter-spacing:.22em;text-indent:.22em;color:var(--paper2);white-space:nowrap;cursor:pointer;
   width:88px;height:72px;box-sizing:border-box;padding:0;background:url(../assets/ui2/small.png) center/100% 100% no-repeat;border:none;
