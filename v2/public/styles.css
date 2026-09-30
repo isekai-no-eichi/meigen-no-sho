@@ -32,9 +32,12 @@ html,body{margin:0;overflow:hidden;overscroll-behavior:none;font-family:var(--se
 #talk .txt{min-height:1.6em;white-space:nowrap;font-size:clamp(13px,3.6vmin,19px);line-height:1.7;letter-spacing:.06em;font-weight:500;color:var(--gold2);
   text-shadow:0 1px 2px #000,0 0 12px rgba(0,0,0,.8)}
 #talk.slow{transition:opacity 2.6s ease}
+/* 2026-09-30 KEI「『2回タップ〜』以外は画面に文字を出なくていい」: 本の画面の状況の文は出さない */
+#talk{display:none}
 
 /* ---- 最初の一言（表示から5秒後・細い金の罫線1本＋一文） ---- */
-#hint{position:fixed;left:50%;top:44%;top:44dvh;transform:translate(-50%,-50%);display:flex;flex-direction:column-reverse;z-index:9;pointer-events:none;text-align:center;
+/* 2026-09-30 KEI: 本の上に重ねず、本と下のボタン列のあいだへ。元の位置に戻す時は 66 → 44 に（この1か所） */
+#hint{position:fixed;left:50%;top:66%;top:66dvh;transform:translate(-50%,-50%);display:flex;flex-direction:column-reverse;z-index:9;pointer-events:none;text-align:center;
   opacity:0;transition:opacity 1.6s ease}
 #hint.show{opacity:1}
 /* 横向きの入口（2026-09-26 QA D13）: 案内だけ出し、ボタンと「2回タップ」の文字は隠す。読書画面は対象外 */

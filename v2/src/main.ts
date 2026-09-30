@@ -118,7 +118,9 @@ const reader = new Reader({
 const ui = new Ui({
   onOpen: (mode, title) => beginRead(mode, title),
   onToggleSound: () => toggleSound(),
-  onSay: line => say(line, 2500),
+  // 2026-09-30 KEI「『2回タップ〜』以外は画面に文字を出なくていい」: 本の画面の状況の文は出さない。
+  // 戻す時は下の行を say(line, 2500) に（#talk の display:none も styles.css で外す）
+  onSay: line => { void line; void say; },
   // 「しおりを外す」（2026-09-17 KEI）。3Dの本から紐を消し、次は栞なし＝シャッフルで開く
   onClearBookmark: () => { scene.refreshRibbon(); },
 });
