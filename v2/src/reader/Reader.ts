@@ -88,6 +88,7 @@ export class Reader {
   private glowFl = 0.8; private glowTarget = 0.8;
 
   private uiTimer: ReturnType<typeof setTimeout> | null = null;
+  private dawnTimer: ReturnType<typeof setTimeout> | null = null;
   private uiJustWoke = 0;
   private ribbonShown = false;
   private candleOn = false;
@@ -177,10 +178,15 @@ export class Reader {
     if (opts && opts.bg) { bgEl.style.backgroundImage = 'url(' + opts.bg + ')'; bgEl.classList.add('snap'); }
     else { bgEl.style.backgroundImage = ''; bgEl.classList.remove('snap'); }
     const mc = !!(opts && opts.matchCut);
+    const dawn = !!(opts && opts.dawn);
     this.root.classList.toggle('matchcut', mc);
+    // 夜明けの間は下ボタン列を完全に隠す（2026-09-30 KEI 実機:「音」が一瞬映って消え、また出る）。
+    // 旧: show を付けた後に uihide を setTimeout(0) で足していたため、その間の1フレームに opacity .92 で描かれていた。
+    //     → show より先に同期で uihide＋dawning（visibility:hidden）を付け、ボタンは uiWake(6.8s) の1回だけ出す。
+    if (dawn) this.root.classList.add('uihide', 'dawning');
     this.root.classList.add('show');
     this.cv.classList.add('in'); this.cv.classList.add('sway');
-    if (opts && opts.dawn) this.dawn(); else this.rampGlow(1.0, mc ? 1100 : 3600);
+    if (dawn) this.dawn(); else this.rampGlow(1.0, mc ? 1100 : 3600);
     this.pagesReady.then(() => {
       this.draw(); this.updateFavUI();
       [300, 1200, 2600].forEach(ms => setTimeout(() => { this.layout(); this.draw(); this.placeRibbon(false); }, ms));
@@ -204,7 +210,7 @@ export class Reader {
     }
     this.primed = null;
     this.opened = true;
-    this.uiWake();
+    if (!dawn) this.uiWake();                            // 夜明けの時は dawn() の 6.8s 後の uiWake だけ
     this.pump();
     this.syncLoading();
   }
@@ -230,14 +236,20 @@ export class Reader {
     c.style.transition = 'none'; c.classList.remove('on');                // ろうそくは完全に消えた状態から
     this.glowBase = 0; this.lampLevel = 0; this.draw();
     void this.cv.offsetHeight;
-    setTimeout(() => this.root.classList.add('uihide'), 0);                 // ボタンは紙が見えるまで出さない
+    // ボタンは紙が見えるまで出さない（uihide・dawning は open() が show より先に同期で付け済み）
     setTimeout(() => { c.style.transition = 'opacity 3.2s ease-in'; c.classList.add('on'); }, 600);   // 闇の中でろうそくがボワッと灯る
     setTimeout(() => this.rampGlow(1.0, 5000), 1000);                      // 灯りが紙へ満ちていく
     setTimeout(() => {                                                     // 紙と部屋が闇から浮かぶ（5秒）
       dark.forEach(el => { el.style.transition = 'filter 5s ease-in-out'; el.style.filter = ''; });
       setTimeout(() => { dark.forEach(el => { el.style.transition = ''; }); c.style.transition = ''; }, 5200);
     }, 1500);
-    setTimeout(() => this.uiWake(), 6800);
+    if (this.dawnTimer) clearTimeout(this.dawnTimer);
+    this.dawnTimer = setTimeout(() => {
+      this.dawnTimer = null;
+      if (!this.opened) return;
+      this.root.classList.remove('dawning');
+      this.uiWake();
+    }, 6800);
   }
   /** 本を閉じる儀式（ページの世界が先に沈む） */
   closeRitual(): void {
@@ -250,7 +262,8 @@ export class Reader {
   hide(): void {
     this.opened = false;
     this.pendingFlip = 0; this.el.load.classList.remove('show');
-    this.root.classList.remove('show', 'matchcut');
+    this.root.classList.remove('show', 'matchcut', 'dawning');
+    if (this.dawnTimer) { clearTimeout(this.dawnTimer); this.dawnTimer = null; }
     this.cv.classList.remove('out', 'in', 'sway');
     this.glowBase = 0; this.lampLevel = 0;
     this.el.paperGlow.style.opacity = '0';
@@ -442,6 +455,7 @@ export class Reader {
       : '<svg width="18" height="16" viewBox="0 0 24 20" fill="none" stroke="#8a7a58" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M3 7h4l5-4v14l-5-4H3z"/><path d="M16 7l5 6M21 7l-5 6"/></svg>';
   }
   private uiWake(): void {
+    if (this.root.classList.contains('dawning')) return;   // 夜明けの間は触っても出さない（出るのは 6.8s の1回だけ）
     if (this.root.classList.contains('uihide')) this.uiJustWoke = performance.now();
     this.root.classList.remove('uihide');
     if (this.uiTimer) clearTimeout(this.uiTimer);

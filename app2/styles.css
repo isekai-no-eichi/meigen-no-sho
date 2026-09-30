@@ -209,6 +209,8 @@ body.land-block.stage-book #ui,body.land-block.stage-book #hint{visibility:hidde
 @keyframes ribbonSway{from{transform:rotate(-.55deg)}to{transform:rotate(.55deg)}}
 /* 読んでいる間はUIを闇へ溶かす（2.5秒操作なし）。画面の下側に触れれば戻る */
 #reader.uihide #favBtn,#reader.uihide #favListBtn,#reader.uihide #setBtn,#reader.uihide #seen,#reader.uihide #backBtn{opacity:0 !important;transition:opacity 1.6s ease}
+/* 本に潜った直後の夜明け（約6.8秒）は、ボタンを描かない（2026-09-30 KEI: 「音」が一瞬映るちらつき） */
+#reader.dawning #favBtn,#reader.dawning #favListBtn,#reader.dawning #setBtn,#reader.dawning #seen,#reader.dawning #backBtn{visibility:hidden !important}
 /* 紙は机の上の「物」。全体をわずかに傾け、接地影を足す（KEI 2026-09-07 Phase 4）。
    当たり判定は傾けない座標系のまま（横方向のドラッグ量で決まるので 2.2° では実質ずれない）。 */
 #book{--tilt:0deg;position:fixed;left:50%;top:46%;transform:translate(-50%,-50%) scale(.97) rotate(var(--tilt));z-index:2;
