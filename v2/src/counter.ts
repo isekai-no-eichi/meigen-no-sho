@@ -14,7 +14,8 @@ import { isUnlocked } from './state';
 const BASE = 'https://abacus.jasoncameron.dev';
 // 本番（github.io）と手元の検証で名前空間を分ける。ローカルで試しても本番の数字は動かない
 const NS = /github\.io$/i.test(location.hostname) ? 'kei-meigen-book' : 'kei-meigen-book-test';
-const KEY = 'visits';                            // 2026-09-17: 1本だけ（旧 tiktok/instagram/other は廃止）
+// 2026-09-30 KEI 指示で visits → visits2（発売前の数え直し）
+const KEY = 'visits2';                           // 2026-09-17: 1本だけ（旧 tiktok/instagram/other は廃止）
 const SESSION_KEY = 'bookexp-hit-counted';      // sessionStorage 専用（localStorage とは別世界）
 const TIMEOUT = 3000;
 

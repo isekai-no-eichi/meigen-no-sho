@@ -124,6 +124,10 @@ export function a2hsMark(): void { try { localStorage.setItem(K.a2hs, '1'); } ca
 // localStorage が読めない（throw）時は「解錠済み」と誤判定せず、ゲートを出す（2026-09-25 QA）
 export function isUnlocked(): boolean { try { return !!localStorage.getItem(K.unlocked); } catch { return false; } }
 export function markUnlocked(): void { try { localStorage.setItem(K.unlocked, '1'); } catch { /* noop */ } }
+// ?reset=1: bookexp-unlocked だけ消してゲートを未解錠の初回に戻す（KEI が撮影のため合言葉の画面へ戻す・2026-09-30）。
+//   他の bookexp-*（設定・お気に入り・栞・統計）には触らない。解錠を外す方向なので誰が付けても安全。
+//   ここ（state.ts）で消すのは、BookScene 等がモジュール読込時に isUnlocked() を見るより先に効かせるため。
+if (/(^|[?&])reset=1(&|$)/.test(location.search)) { try { localStorage.removeItem(K.unlocked); } catch { /* noop */ } }
 
 // ---- 共通 ----
 /** リポジトリ直下の assets/ を指す。base が /meigen-no-sho/app2/ なので ../assets/ で届く */

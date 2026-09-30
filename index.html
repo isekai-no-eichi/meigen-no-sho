@@ -52,7 +52,8 @@
     // 数えない読み取り専用の GET（/hit ではなく /get）。3秒で諦める
     var ac = new AbortController();
     var to = setTimeout(function () { ac.abort(); }, 3000);
-    fetch('https://abacus.jasoncameron.dev/get/kei-meigen-book/visits',
+    // 2026-09-30 KEI 指示で visits → visits2（発売前の数え直し）
+    fetch('https://abacus.jasoncameron.dev/get/kei-meigen-book/visits2',
           { signal: ac.signal, cache: 'no-store', mode: 'cors' })
       .then(function (r) { if (!r.ok) throw 0; return r.json(); })
       .then(function (j) {
