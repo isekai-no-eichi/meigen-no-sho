@@ -122,8 +122,12 @@ export function a2hsMark(): void { try { localStorage.setItem(K.a2hs, '1'); } ca
 // ---- 合言葉（初回だけのゲート・2026-09-21 KEI） ----
 /** 一度でも合言葉を通したか。通したあとは今までどおり本が最初から出る */
 // localStorage が読めない（throw）時は「解錠済み」と誤判定せず、ゲートを出す（2026-09-25 QA）
-export function isUnlocked(): boolean { try { return !!localStorage.getItem(K.unlocked); } catch { return false; } }
-export function markUnlocked(): void { try { localStorage.setItem(K.unlocked, '1'); } catch { /* noop */ } }
+// 2026-10-02: 解錠の印は GATE_VERSION の値で保存する。合言葉（Gate.ts の PASSPHRASE_HASH）を変えたら
+//   ここも新しい値にする → 旧い値（'1' や前の版）の端末は全部1回だけ再入力になる。他の bookexp-*（印・栞・設定）は不変。
+//   Gate.ts が state.ts を import しているので、循環を避けてここに置く。
+export const GATE_VERSION = '2026-10-02a';
+export function isUnlocked(): boolean { try { return localStorage.getItem(K.unlocked) === GATE_VERSION; } catch { return false; } }
+export function markUnlocked(): void { try { localStorage.setItem(K.unlocked, GATE_VERSION); } catch { /* noop */ } }
 // ?reset=1: bookexp-unlocked だけ消してゲートを未解錠の初回に戻す（KEI が撮影のため合言葉の画面へ戻す・2026-09-30）。
 //   他の bookexp-*（設定・お気に入り・栞・統計）には触らない。解錠を外す方向なので誰が付けても安全。
 //   ここ（state.ts）で消すのは、BookScene 等がモジュール読込時に isUnlocked() を見るより先に効かせるため。

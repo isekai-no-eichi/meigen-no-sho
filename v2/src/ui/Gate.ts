@@ -12,7 +12,8 @@ import { QP, isUnlocked } from '../state';
 
 /** 合言葉の正解は平文で置かない（2026-09-25 KEI GO・発売準備）。
  *  値 = SHA-256( norm(合言葉) ) の hex。変える時は node で下の norm と同じ処理を通した文字列をハッシュして差し替える。
- *  （例: node -e "…createHash('sha256').update(normした合言葉).digest('hex')"） */
+ *  （例: node -e "…createHash('sha256').update(normした合言葉).digest('hex')"）
+ *  2026-10-02: 合言葉を変えたら state.ts の GATE_VERSION も変える（全端末が1回だけ再入力・印と栞は残る）。 */
 const PASSPHRASE_HASH = '53fac1b40bddfa94876e3b6929f70e318f00d889094506364b916c3cb3abc263';
 
 // ---- 演出の長さ（KEI の微調整はこの3つ。CSS へも変数で渡すので、ここを直せば見た目も揃う） ----
