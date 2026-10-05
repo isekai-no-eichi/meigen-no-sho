@@ -17,7 +17,7 @@ import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { asset, MOBILE, QP, BUILD, loadFavs, hasBookmark, isUnlocked } from '../state';
+import { asset, MOBILE, QP, BUILD, PERF, loadFavs, hasBookmark, isUnlocked } from '../state';
 import { RoomBackground } from './RoomBackground';
 
 /** 表紙の箔押しタイトル「名言の書」。2026-09-08 KEI「チャチい」→ 無し。戻す時は true */
@@ -179,7 +179,10 @@ export class BookScene {
   private tiltCur = { x: 0, y: 0 };
 
   constructor(canvas: HTMLCanvasElement) {
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    // B: ポスト処理を使う時は 3D が MSAA なしの RT に描かれ、画面の AA は効かない＝帯域だけ食う → off。
+    //    composer を作らない経路（?classic / q_post=0）だけ従来どおり AA あり。?perf=0 は常に AA あり
+    const usesComposer = QUALITY && QP.get('q_post') !== '0';
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !(PERF && usesComposer), alpha: true });
     this.renderer.setClearColor(0x000000, 0);
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, MOBILE ? 1.5 : 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -753,8 +756,10 @@ export class BookScene {
     // 影マップの更新だけ 15Hz（ろうそくの明滅は 60Hz のまま）
     if (this.renderer.shadowMap.enabled && t - this.shadowT >= 1 / 15) { this.shadowT = t; this.renderer.shadowMap.needsUpdate = true; }
 
-    this.tiltCur.x += (this.tiltRaw.x - this.tiltCur.x) * 0.08;
-    this.tiltCur.y += (this.tiltRaw.y - this.tiltCur.y) * 0.08;
+    // 60fps で 0.08/フレームだった追従を時間基準に（30fps でも同じ速さ。60fps では従来と同値）
+    const tk = PERF ? 1 - Math.pow(0.92, wdt * 60) : 0.08;
+    this.tiltCur.x += (this.tiltRaw.x - this.tiltCur.x) * tk;
+    this.tiltCur.y += (this.tiltRaw.y - this.tiltCur.y) * tk;
     this.candleB.position.set(0.28 + this.tiltCur.x * 0.22, 0.34 + this.tiltCur.y * 0.12, 0.30 - this.tiltCur.y * 0.15);
     this.candleB.intensity = (CANDLE_I + Math.sin(t * 0.71) * 0.18 + Math.sin(t * 1.63 + 1.1) * 0.11 + Math.sin(t * 0.29 + 2.4) * 0.14 + this.shake * 0.6)
       * (1 - this.openFlare * 0.80);                 // 開く瞬間は書斎の灯りを引き、光を本の中に集める

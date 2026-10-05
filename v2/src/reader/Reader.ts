@@ -8,7 +8,7 @@
 //    - 紙は丸めすぎない（peel の P1/P2 係数）
 //    - finishFlip の dur / イージング / commitTo のしきい値
 // ============================================================
-import { asset, MOBILE, QP, S, loadFavs, saveFavs, loadBookmark, saveBookmark, clearBookmark, bookmarkPages, removeBookmarkPage, type Bookmark } from '../state';
+import { asset, MOBILE, QP, PERF, S, loadFavs, saveFavs, loadBookmark, saveBookmark, clearBookmark, bookmarkPages, removeBookmarkPage, type Bookmark } from '../state';
 import { pageSound, sealSound, ribbonSound, haptic, ensureAudio } from '../audio';
 
 const N = 790;
@@ -155,6 +155,8 @@ export class Reader {
       veil: q('veil'), seen: q('seen'), backBtn: q('backBtn'), favBtn: q('favBtn'),
       favListBtn: q('favListBtn'), setBtn: q('setBtn'), toast: q('toast'), favPanel: q('favPanel'), load: q('rload'),
     };
+    // G: 炎のぼやぼや（flameGlow・screen 合成＋blur）は撤去（2026-10-05 KEI「重いなら外していい、邪魔だった」）
+    if (PERF) this.el.flameGlow.remove();
     this.el.veil.style.transition = 'opacity 1.4s ease';
     this.el.candleImg.addEventListener('error', () => { this.el.candleImg.style.display = 'none'; });
     this.el.candleImg.addEventListener('load', () => this.candleLit());
@@ -1163,7 +1165,7 @@ export class Reader {
     this.el.flame.style.transform = 'scaleY(' + (0.92 + n * 0.10 + this._fl.cur * 0.25).toFixed(3) + ') scaleX(' + (0.96 + n * 0.05).toFixed(3) + ') skewX(' + (dx * 4).toFixed(1) + 'deg)';
     this.el.flame.style.opacity = (0.9 + n * 0.08 + this._fl.cur * 0.2).toFixed(3);
     this.el.halo.style.transform = 'translate(' + (35 + dx).toFixed(1) + '%,' + (40 + dy).toFixed(1) + '%) scale(' + (1 + n * 0.03).toFixed(3) + ')';
-    if (this.candleOn) {
+    if (this.candleOn && !PERF) {                 // G: flameGlow は撤去（?perf=0 の時だけ旧動作で毎フレーム測る）
       const r = this.el.candleImg.getBoundingClientRect();
       const fx = r.left + r.width * 0.43, fy = r.top + r.height * 0.23;
       const fast = Math.sin(this._fl.t * 9.1) * 0.5 + Math.sin(this._fl.t * 13.7 + 1) * 0.3 + Math.sin(this._fl.t * 23 + 2) * 0.2;

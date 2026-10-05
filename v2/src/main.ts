@@ -9,7 +9,7 @@ import { Reader } from './reader/Reader';
 import { Ui } from './ui/Ui';
 import { Gate, gateNeeded } from './ui/Gate';
 import {
-  S, ST, saveStats, hasBookmark, favCount, MOBILE, QP, markUnlocked,
+  S, ST, saveStats, hasBookmark, favCount, MOBILE, QP, markUnlocked, PERF,
 } from './state';
 import {
   initAudioGlobalHooks, ensureAudio, toggleSound, onSoundChange, activity, flipDuck,
@@ -24,6 +24,15 @@ type Stage = 'book' | 'opening' | 'read' | 'closing';
 
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
 const canvas = document.getElementById('c') as HTMLCanvasElement;
+// 負荷対策（2026-10-05）。?perf=0 は旧動作（grain 200%・flameGlow あり・60fps・AA あり・読書中も #c/#grain を合成）
+if (!PERF) document.documentElement.classList.add('perf0');
+/** A: 読書中は不透明な読書画面の下にある 3D canvas と #grain を合成から外す（visibility なのでレイアウトは動かない） */
+function hideUnder(on: boolean): void {
+  if (!PERF) return;
+  const v = on ? 'hidden' : '';
+  canvas.style.visibility = v;
+  const g = document.getElementById('grain'); if (g) g.style.visibility = v;
+}
 
 // ---- 画面に足す要素（HTML を小さく保つ） ----
 // タイトルカード「名言の書」は開く時に出す（2026-09-13 KEI 復活。09-07 に消したが「あった方がいい」）。
@@ -212,6 +221,8 @@ function startOpening(mode: string, title?: string): void {
       opening = false; diving = false; lifting = false; openT = 0; diveT = 0;
       if (scene.hinge) scene.hinge.rotation.z = 0;
     }, 600);
+    // A: 読書画面（matchcut .45s）と暗転の解け（350ms+.6s）が終わってから隠す
+    setTimeout(() => { if (stage === 'read') hideUnder(true); }, 1000);
   });
 }
 
@@ -247,6 +258,7 @@ function closeBook(): void {
   if (closing || stage !== 'read') return;
   track('close_book', { pages: pagesSession });
   setStage('closing');
+  hideUnder(false);                 // A: 読書画面がまだ全面を覆っている間に戻す（3D は closing から描き始める）
   closing = { phase: 'wait', t: 0 };
   reader.closeRitual();
   bgmFadeOut(1300);
@@ -360,7 +372,14 @@ scene.load(() => {
   ui.start();
 });
 
-scene.renderer.setAnimationLoop(() => {
+// F: 部屋の3Dは常に 30fps（2026-10-05 KEI）。動きは時間基準なので速さは同じ。読書のめくり canvas は別ループで全速のまま
+const FRAME_MIN = 1000 / 30 - 3;
+let lastDraw = -1e9;
+scene.renderer.setAnimationLoop((now: number) => {
+  if (PERF && !(stage === 'read' && !diving)) {
+    if (now - lastDraw < FRAME_MIN) return;
+    lastDraw = now;
+  }
   const raw = clock.getDelta();
   const dt = Math.min(raw, 0.05), wdt = Math.min(raw, 0.5), t = clock.elapsedTime;
   bgmTick(wdt);

@@ -18,10 +18,14 @@ html,body{margin:0;overflow:hidden;overscroll-behavior:none;font-family:var(--se
 #c{position:fixed;inset:0;display:block;width:100%;height:100%;touch-action:none;z-index:2}
 #vignette{position:fixed;inset:0;pointer-events:none;z-index:4;
   background:radial-gradient(ellipse 70% 62% at 50% 46%,transparent 40%,rgba(0,0,0,.35) 75%,rgba(0,0,0,.72) 100%)}
-#grain{position:fixed;inset:-50%;width:200%;height:200%;pointer-events:none;z-index:4;opacity:.055;mix-blend-mode:overlay;
+/* G/E（2026-10-05）: 200%×200% → 118%（約1/3）。動く距離は旧と同じ画素量（旧 translate % × 2 を vw/vh で）。最大 8vw/8vh 動くので四辺 9% はみ出し（1% 余裕） */
+#grain{position:fixed;inset:-9%;width:118%;height:118%;pointer-events:none;z-index:4;opacity:.055;mix-blend-mode:overlay;
   background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .9 0'/></filter><rect width='160' height='160' filter='url(%23n)'/></svg>");
   animation:grain 1.2s steps(6) infinite}
-@keyframes grain{0%{transform:translate(0,0)}20%{transform:translate(-3%,2%)}40%{transform:translate(2%,-4%)}60%{transform:translate(-4%,-1%)}80%{transform:translate(3%,3%)}100%{transform:translate(0,0)}}
+@keyframes grain{0%{transform:translate(0,0)}20%{transform:translate(-6vw,4vh)}40%{transform:translate(4vw,-8vh)}60%{transform:translate(-8vw,-2vh)}80%{transform:translate(6vw,6vh)}100%{transform:translate(0,0)}}
+/* ?perf=0（旧動作） */
+.perf0 #grain{inset:-50%;width:200%;height:200%;animation-name:grain0}
+@keyframes grain0{0%{transform:translate(0,0)}20%{transform:translate(-3%,2%)}40%{transform:translate(2%,-4%)}60%{transform:translate(-4%,-1%)}80%{transform:translate(3%,3%)}100%{transform:translate(0,0)}}
 @media (prefers-reduced-motion:reduce){#grain{animation:none}}
 
 /* ---- 字幕（本の声）: 金の細字 ---- */

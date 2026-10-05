@@ -141,6 +141,8 @@ export function asset(path: string): string {
 export const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || '');
 export const QP = new URLSearchParams(location.search);
 export const BUILD = '20260918v20';
+/** 負荷対策 A/B/C/F/G（2026-10-05 KEI）。?perf=0 で全部旧動作に戻す（実機での比較用） */
+export const PERF = QP.get('perf') !== '0';
 
 // 2026-09-09 KEI: BUILD を上げても栞・印・枚数は消さない（更新のたびに読者の記録が飛ぶ不具合）。
 // 記録するのは「どの版まで見たか」だけ。設定の形を変える時だけ、ここに移行処理を足す。
