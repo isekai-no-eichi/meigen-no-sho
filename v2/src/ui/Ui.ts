@@ -69,7 +69,7 @@ export class Ui {
     preloadUiImages();
     const wrap = document.createElement('div');
     wrap.innerHTML = `
-<div id="hint"><div class="rule"></div><div class="txt">2回タップで、本を読む</div></div>
+<div id="hint"><div class="rule"></div><div class="txt">2回タップで本を読む</div></div>
 <div id="landMsg">縦にしてください</div>
 <div id="ui">
   <button class="seal wide" id="bInfo">この本の説明</button>
@@ -79,31 +79,31 @@ export class Ui {
   </div>
   <button class="seal wide" id="bFav" aria-label="お気に入りを読む" hidden>お気に入りを読む</button>
 </div>
-<div id="a2hs"><span>ホーム画面に追加すると、枠のない全画面で読める</span><button id="a2hsX" aria-label="閉じる">✕</button></div>
+<div id="a2hs"><span>ホーム画面に追加すると枠のない全画面で読める</span><button id="a2hsX" aria-label="閉じる">✕</button></div>
 <div class="ov" id="menu"><div class="box letter frame">
   <div class="lwrap">
   <div class="lbody" id="letterBody">
   <div class="tab" data-tab="0">
     <p class="h">この本について</p>
-    <p>私が今までに収集した言の葉を、<br>一冊に全て入れたのが、この本である。</p>
-    <p>ただの本ではない。<br>開くたびに、中身が変わる。<br>そして今も、増え続けている。</p>
-    <p>この本に救われた人は、たくさんいる。</p>
-    <p>失恋した人。<br>仕事がうまくいかなかった人。<br>生きる意味がわからなくなった人。<br>自ら命を絶とうとした人を、止めたことだってある。</p>
-    <p>言葉には、それだけの力がある。</p>
-    <p class="last">だから、悩んだとき、行き詰まったとき、この本を開いてほしい。<br>今のあなたにぴったりの一枚と、きっと出会えるはずである。</p>
+    <p>私が今までに収集した言の葉を<br>一冊に全て入れたのがこの本である。</p>
+    <p>ただの本ではない。<br>開くたびにページの順番が入れ替わる。<br>そして今も増え続けている。</p>
+    <p>この本に救われた人は多い。</p>
+    <p>失恋した人。<br>仕事がうまくいかなかった人。<br>生きる意味を見失った人。<br>自ら命を絶とうとした人を止めたこともある。</p>
+    <p>言葉にはそれだけの力がある。</p>
+    <p class="last">悩んだとき。<br>行き詰まったとき。<br>この本を開いてほしい。<br>今のあなたに合う一枚と出会えるはずである。</p>
   </div>
   <div class="tab" data-tab="1" hidden>
     <p class="h">しおり</p>
-    <p>途中で本を閉じたいときは、<br>画面の下にある<span class="k">【栞】</span>を押す。</p>
-    <p>そのページに栞が挟まり、<br>次からは最初の画面にある<span class="k">【栞から読む】</span>から続きを読めるようになる。</p>
-    <p>最初の画面にある<span class="k">【栞を外す】</span>を押せば、<br>挟んでいた栞を外すことができる。</p>
-    <p class="last">その後は、また本を開くたびに名言の順番が変わる。</p>
+    <p>途中で本を閉じたいときは<br>画面の下にある<span class="k">【栞】</span>を押す。</p>
+    <p>そのページに栞が挟まり<br>次からは最初の画面にある<span class="k">【栞から読む】</span>から続きを読める。</p>
+    <p>最初の画面にある<span class="k">【栞を外す】</span>を押せば<br>挟んでいた栞を外すことができる。</p>
+    <p class="last">その後はまた本を開くたびに名言の順番が変わる。</p>
   </div>
   <div class="tab" data-tab="2" hidden>
     <p class="h">お気に入り</p>
-    <p>残しておきたい名言を見つけたら、<br>画面の下にある<span class="k">【印】</span>を押す。</p>
-    <p>印をつけた名言は、<br>最初の画面にある<span class="k">【お気に入りを読む】</span>から、まとめて読み返すことができる。</p>
-    <p>もう一度<span class="k">【印】</span>を押せば、その名言はお気に入りから外れる。</p>
+    <p>残しておきたい名言を見つけたら<br>画面の下にある<span class="k">【印】</span>を押す。</p>
+    <p>印をつけた名言は<br>最初の画面にある<span class="k">【お気に入りを読む】</span>からまとめて読み返すことができる。</p>
+    <p>もう一度<span class="k">【印】</span>を押せばその名言はお気に入りから外れる。</p>
     <p class="last">あとでまた読みたいと思った名言があれば使ってほしい。</p>
   </div>
   </div>
@@ -142,7 +142,7 @@ export class Ui {
     this.bResume.addEventListener('click', () => {
       if (this.locked) return;
       if (hasBookmark()) this.hooks.onOpen('resume');
-      else { this.updateEntry(); this.hooks.onSay('しおりは、まだ挟まれていません'); }
+      else { this.updateEntry(); this.hooks.onSay('しおりはまだ挟まれていません'); }
     });
     // しおりを外す＝しおりを全部消す。次に開く時はまたシャッフル（Reader.open が栞なしで混ぜ直す）
     this.bClearBm.addEventListener('click', () => {
@@ -150,12 +150,12 @@ export class Ui {
       clearBookmark();
       this.updateEntry();
       this.hooks.onClearBookmark();
-      this.hooks.onSay('しおりを外した。次からはまた、開くたびに変わる');
+      this.hooks.onSay('しおりを外した。次からはまた開くたびに変わる');
     });
     this.bFav.addEventListener('click', () => {
       if (this.locked) return;
       if (favCount() > 0) this.hooks.onOpen('fav', 'お気に入りのページ');
-      else { this.updateEntry(); this.hooks.onSay('お気に入りは、まだ登録されていません'); }
+      else { this.updateEntry(); this.hooks.onSay('お気に入りはまだ登録されていません'); }
     });
     this.updateEntry();
     $('a2hsX').addEventListener('click', () => this.closeA2hs());
