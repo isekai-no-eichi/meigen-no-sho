@@ -157,6 +157,7 @@ export class Reader {
     };
     // G: 炎のぼやぼや（flameGlow・screen 合成＋blur）は撤去（2026-10-05 KEI「重いなら外していい、邪魔だった」）
     if (PERF) this.el.flameGlow.remove();
+    if (PERF) this.el.shade.remove();            // 2026-10-05 KEI「縁の影は要らない（めくる度に消えて気になる）」→ 画面の影の層も撤去（?perf=0 だけ旧動作）
     this.el.veil.style.transition = 'opacity 1.4s ease';
     this.el.candleImg.addEventListener('error', () => { this.el.candleImg.style.display = 'none'; });
     this.el.candleImg.addEventListener('load', () => this.candleLit());
@@ -787,7 +788,7 @@ export class Reader {
     if (!flip) {
       ctx.drawImage(cur, 0, 0, pw, ph);
       this.gutter(pw, ph, 0);
-      this.paperBody(pw, ph);
+      if (!PERF) this.paperBody(pw, ph);           // 2026-10-05: 静止時だけ出る縁の影はめくり時に消えて目立つ → PERF では描かない
       this.drawSealFor(pw, ph, this.deck[this.index]);
       return;
     }
@@ -1159,8 +1160,10 @@ export class Reader {
     const lvl = 0.95 + n * 0.05 + this._fl.cur * 0.45;
     this.el.candle.style.opacity = lvl.toFixed(3);
     const dx = this.smoothNoise(this._fl.t * 0.8 + 5) * 0.9, dy = this.smoothNoise(this._fl.t * 0.7 + 9) * 0.6, sc = 1 + n * 0.02;
-    this.el.shade.style.transform = 'translate(' + dx.toFixed(2) + '%,' + dy.toFixed(2) + '%) scale(' + sc.toFixed(3) + ')';
-    this.el.shade.style.opacity = (0.86 - this._fl.cur * 0.3).toFixed(3);
+    if (!PERF) {
+      this.el.shade.style.transform = 'translate(' + dx.toFixed(2) + '%,' + dy.toFixed(2) + '%) scale(' + sc.toFixed(3) + ')';
+      this.el.shade.style.opacity = (0.86 - this._fl.cur * 0.3).toFixed(3);
+    }
     const gj = this._fl.gust * (0.5 + 0.5 * Math.sin(this._fl.t * 41));
     this.el.halo.style.opacity = Math.min(1, 0.95 + n * 0.10 + this._fl.cur * 0.4 + gj * 0.25).toFixed(3);
     this.el.flame.style.transform = 'scaleY(' + (0.92 + n * 0.10 + this._fl.cur * 0.25).toFixed(3) + ') scaleX(' + (0.96 + n * 0.05).toFixed(3) + ') skewX(' + (dx * 4).toFixed(1) + 'deg)';
