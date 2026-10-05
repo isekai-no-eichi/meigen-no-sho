@@ -560,8 +560,9 @@ export class Reader {
 
   // ---------------------------------------------------------- 描画
   private draw(): void { this.drawInner(); this.lampOverlay(); this.sealRun(this.W - EDGE, this.H - EDGE); }
-  private smoothNoise(t: number): number { return Math.sin(t * 0.61) * 0.5 + Math.sin(t * 1.37 + 1.3) * 0.3 + Math.sin(t * 0.23 + 2.1) * 0.2; }
-  private gustFn(s: number): void { this._fl.gust = Math.min(1.2, this._fl.gust + s); }
+  // 2026-10-05 KEI「めくり時のちかちか（炎の揺らぎ）は邪魔」→ PERF では揺らぎ・突風を止め、光は一定にする（?perf=0 だけ旧動作）
+  private smoothNoise(t: number): number { if (PERF) return 0; return Math.sin(t * 0.61) * 0.5 + Math.sin(t * 1.37 + 1.3) * 0.3 + Math.sin(t * 0.23 + 2.1) * 0.2; }
+  private gustFn(s: number): void { if (PERF) return; this._fl.gust = Math.min(1.2, this._fl.gust + s); }
 
   private lampOverlay(): void {
     if (this.lampLevel <= 0.001) return;
@@ -1088,10 +1089,10 @@ export class Reader {
     if (!this.opened) { requestAnimationFrame(this.dustLoop); return; }   // 読書中以外は描かない（電池）
     dctx.clearRect(0, 0, dc.width, dc.height);
     if (this.glowBase > 0) {
-      if (Math.random() < 0.03) this.glowTarget = 0.55 + Math.random() * 0.45;
-      this.glowFl += (this.glowTarget - this.glowFl) * 0.04;
+      if (!PERF && Math.random() < 0.03) this.glowTarget = 0.55 + Math.random() * 0.45;   // PERF: 脈動なし（2026-10-05）
+      if (!PERF) this.glowFl += (this.glowTarget - this.glowFl) * 0.04;
       const gx = dc.width / 2, gy = dc.height * 0.56;
-      const gr0 = Math.min(dc.width, dc.height) * (0.30 + 0.04 * Math.sin(ts / 700));
+      const gr0 = Math.min(dc.width, dc.height) * (0.30 + (PERF ? 0 : 0.04 * Math.sin(ts / 700)));
       const al = this.glowBase * 0.16 * this.glowFl;
       const gg = dctx.createRadialGradient(gx, gy, 0, gx, gy, gr0 * 2.1);
       gg.addColorStop(0, 'rgba(255,176,70,' + al.toFixed(3) + ')');
@@ -1148,7 +1149,7 @@ export class Reader {
     if (!this.opened) { this._flPrev = now; requestAnimationFrame(this.flickerLoop); return; }
     const dt = Math.min((now - this._flPrev) / 1000, 0.1); this._flPrev = now; this._fl.t += dt;
     if (this._fl.gust > 0.001) { this._fl.gust *= Math.exp(-dt / 0.42); if (this._fl.gust < 0.001) this._fl.gust = 0; }
-    if (this._fl.t > this._fl.next) {
+    if (!PERF && this._fl.t > this._fl.next) {   // PERF: ランダムな暗転なし（2026-10-05）
       this._fl.tgt = Math.random() < 0.45 ? -0.35 - Math.random() * 0.25 : 0;
       this._fl.next = this._fl.t + 8 + Math.random() * 12;
     }
