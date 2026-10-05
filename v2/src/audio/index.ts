@@ -61,7 +61,7 @@ export function setReadingProbe(fn: () => boolean): void { readingNow = fn; }
 export function activity(): void { lastActivity = performance.now(); if (idleQuiet) { idleQuiet = false; duck = 1; ambBoost = 1; } }
 export function flipDuck(): void { duck = 0.82; duckUntil = performance.now() + 550; }
 export function setAmbBoost(v: number): void { ambBoost = v; }
-function rainTarget(): number { return S.rain ? Math.min(1, 0.65 * curve(S.amb) * ambBoostCur) : 0; }
+function rainTarget(): number { return S.rain ? Math.min(1, 0.325 * curve(S.amb) * ambBoostCur) : 0; }
 
 function sxInit(): void {
   if (sx) { if (sx.state === 'suspended') sx.resume().then(tryRoute).catch(() => {}); else tryRoute(); return; }
