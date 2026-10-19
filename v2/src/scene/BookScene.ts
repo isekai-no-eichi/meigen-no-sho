@@ -56,6 +56,10 @@ const FX_ENV = fxOn();
 const ENV_K = FX_ENV ? 0.6 : 1;   // 0.8 では表紙と小口が橙に光りすぎた（2026-10-19 試作版で比較）
 /** pbr: 表紙に革目（ambientCG Leather037）を重ねた法線・roughness、小口に紙の重なりの法線 */
 const FX_PBR = fxOn();
+/** cover: 表紙が本当に開く本（book_open.glb・CoverHinge/PageHinge＋クリップ CoverOpen 2.0s/FirstPage 1.6s）。2026-10-19 試作版で KEI 採用・本番は1枚目をめくらず表紙の着地で潜る（2026-10-20） */
+export const FX_COVER = fxOn();
+/** cover（K）: 古書の紙の色の掛け算。ろうそく・暖炉の光とグレードで橙に寄るので、緑青を持ち上げて打ち消す*/
+const PARCH_TINT = [0.75, 0.95, 1.25];
 
 const GradeShader = {
   uniforms: {
@@ -121,6 +125,56 @@ const BOOK_SELF_SHADOW = false;
 
 const RIB_YAW = -0.06;   // 栞タブの向き（本の上端＝奥端から覗く。2026-09-07 夜 KEI「本の上に挟む」）
 
+/** cover: 平面の UV を張り直す。一番薄い軸を法線、残り2軸の長い方を縦（v）として四隅 0..1。
+ *  1200x1600 の絵が横に伸びないよう、面の縦横比に合わせて絵の上下を少し切る（cover 寄せ） */
+function planarUV(g: THREE.BufferGeometry, flipV: boolean): void {
+  g.computeBoundingBox();
+  const bb = g.boundingBox!, size = bb.getSize(new THREE.Vector3());
+  const s = [size.x, size.y, size.z];
+  const nAx = s.indexOf(Math.min(...s));
+  const rest = [0, 1, 2].filter(i => i !== nAx);
+  const vAx = s[rest[0]] >= s[rest[1]] ? rest[0] : rest[1];
+  const uAx = rest[0] === vAx ? rest[1] : rest[0];
+  const mn = [bb.min.x, bb.min.y, bb.min.z];
+  const pos = g.getAttribute('position');
+  const uv = new Float32Array(pos.count * 2);
+  // 絵（3:4）を面に cover で合わせる：面が絵より横長なら、絵の縦を (絵の比/面の比) だけ使う
+  const aFace = s[uAx] / Math.max(1e-6, s[vAx]), aImg = 1200 / 1600;
+  const vSpan = aFace > aImg ? aImg / aFace : 1, uSpan = aFace > aImg ? 1 : aFace / aImg;
+  for (let i = 0; i < pos.count; i++) {
+    const p = [pos.getX(i), pos.getY(i), pos.getZ(i)];
+    let u = (p[uAx] - mn[uAx]) / Math.max(1e-6, s[uAx]);
+    let v = (p[vAx] - mn[vAx]) / Math.max(1e-6, s[vAx]);
+    if (flipV) v = 1 - v;
+    u = 0.5 + (u - 0.5) * uSpan; v = 0.5 + (v - 0.5) * vSpan;
+    uv[i * 2] = u; uv[i * 2 + 1] = v;
+  }
+  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+}
+/** cover: 三角形を「up を向く面」（group 0）とそれ以外（group 1）に並べ替える。nm はジオメトリ→本の空間の法線行列 */
+function splitByFacing(g: THREE.BufferGeometry, nm: THREE.Matrix3, up: THREE.Vector3): void {
+  const pos = g.getAttribute('position');
+  const idx = g.getIndex();
+  const n = idx ? idx.count : pos.count;
+  const get = (k: number): number => (idx ? idx.getX(k) : k);
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), f = new THREE.Vector3();
+  const front: number[] = [], rest: number[] = [];
+  for (let t = 0; t < n; t += 3) {
+    const i0 = get(t), i1 = get(t + 1), i2 = get(t + 2);
+    a.fromBufferAttribute(pos, i0); b.fromBufferAttribute(pos, i1); c.fromBufferAttribute(pos, i2);
+    f.subVectors(c, b).cross(a.sub(b)).applyMatrix3(nm).normalize();
+    (f.dot(up) > 0.7 ? front : rest).push(i0, i1, i2);
+  }
+  // 1枚目は厚みの無い面なので、表の三角形を裏向きに複製して group 2（素の紙・片面）に。表の絵は片面にして、めくって立った時に鏡文字が透けないように
+  const back: number[] = [];
+  for (let t = 0; t < front.length; t += 3) back.push(front[t], front[t + 2], front[t + 1]);
+  g.setIndex([...front, ...rest, ...back]);
+  g.clearGroups();
+  g.addGroup(0, front.length, 0);
+  g.addGroup(front.length, rest.length, 1);
+  g.addGroup(front.length + rest.length, back.length, 2);
+}
+
 export class BookScene {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
@@ -128,7 +182,15 @@ export class BookScene {
   readonly room = new RoomBackground();
 
   book: THREE.Object3D | null = null;
-  hinge: THREE.Group | null = null;
+  hinge: THREE.Object3D | null = null;
+  /** cover: 1枚目の蝶番（PageHinge）とクリップ。旧 book.glb では null */
+  pageHinge: THREE.Object3D | null = null;
+  private mixer: THREE.AnimationMixer | null = null;
+  private coverAct: THREE.AnimationAction | null = null;
+  /** cover: 開き切った角度（rad）。閉じる時に手で戻す起点 */
+  coverMax = 2.5;
+  /** cover: クリップの長さ（秒）。main.ts の台本が使う */
+  coverSec = 0;
   bookBB: THREE.Box3 | null = null;
   private pivot = new THREE.Group();
   private ribbon: THREE.Mesh | null = null;
@@ -277,7 +339,7 @@ export class BookScene {
     loader.setDRACOLoader(draco);
     const url = glbOverride
       ? new URL('../' + glbOverride, document.baseURI).href + '?_=' + Date.now()
-      : new URL('book.glb?b=' + BUILD, document.baseURI).href;
+      : new URL((FX_COVER ? 'book_open.glb' : 'book.glb') + '?b=' + BUILD, document.baseURI).href;
     loader.load(url, g => {
       const book = g.scene; book.rotation.z = 0.06; this.pivot.add(book); this.book = book;
       book.traverse(o => {
@@ -292,9 +354,26 @@ export class BookScene {
           if (QUALITY) { m.castShadow = true; m.receiveShadow = BOOK_SELF_SHADOW; mat.envMapIntensity = 0.22 * ENV_K; }
         }
       });
+      const rig = FX_COVER ? book.getObjectByName('CoverHinge') : undefined;
+      if (rig) this.applyParchment(book);
       if (QUALITY) this.applyLeather(book);
       const cover = book.getObjectByName('Cover_Front');
-      if (cover) {
+      if (rig) {
+        // cover: Blender 側の蝶番 Empty をそのまま使う（hinge.attach(cover) で付け替えると見返しだけが開くので、しない）
+        this.hinge = rig;
+        this.pageHinge = book.getObjectByName('PageHinge') || null;
+        const mixer = new THREE.AnimationMixer(book); this.mixer = mixer;
+        const mk = (name: string): THREE.AnimationAction | null => {
+          const clip = THREE.AnimationClip.findByName(g.animations, name);
+          if (!clip) return null;
+          const a = mixer.clipAction(clip); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true;
+          return a;
+        };
+        this.coverAct = mk('CoverOpen');
+        this.coverSec = this.coverAct ? this.coverAct.getClip().duration : 0;
+        // 2026-10-20 KEI「一枚目捲れるやつは要らなかった」→ 1枚目（FirstPage）は再生しない。表紙の着地でそのまま名言の上へ潜る
+        this.coverMax = THREE.MathUtils.degToRad(150);
+      } else if (cover) {
         const bb = new THREE.Box3().setFromObject(cover);
         const hinge = new THREE.Group();
         hinge.position.set(bb.min.x, (bb.min.y + bb.max.y) / 2, 0);
@@ -324,6 +403,89 @@ export class BookScene {
       if (onFail) onFail();
     });
   }
+
+  /** cover: 見返し（Cover_Endpaper）・1枚目（Page_First）・紙の束の上面（M_PageTop）を古書の紙に（2026-10-19 K）。
+   *  旧（J）: 無地 #cdbf9c×0.62・envMap 0.12 → 照明と暖炉の映り込みで平らな明るい黄色＝段ボール箱に見えた。
+   *  新: backside.jpg（めくりの裏面＝染みと繊維のある素の紙）を貼り、色を PARCH_PK 倍に落とし、映り込みはほぼ 0・roughness 1。
+   *  UV は Blender の物を使わず、各面の平面（一番薄い軸を法線とみなす）に四隅 0..1 で張り直す。
+   *  1枚目の表（表紙側を向く面）だけは「最初に読むページ」の絵（pages/pN.jpg・既定 p1）。裏と縁は素の紙。
+   *  明るさ pk 0.3・見返しはさらに ×0.7・色は PARCH_TINT（暖色の光を打ち消す寒色寄り）。本番には切替スイッチを入れていない（試作版のみ） */
+  private parchMats: THREE.MeshStandardMaterial[] = [];
+  private firstMat: THREE.MeshStandardMaterial | null = null;
+  private firstPageUrl = '';
+  private applyParchment(root: THREE.Object3D): void {
+    const tl = new THREE.TextureLoader();
+    const pk = 0.3;   // 0.2/0.3/0.45/0.6 を撮って比較（2026-10-19 試作版 K）。0.45 以上は橙に焼け、0.2 は文字が沈む
+    const map = tl.load(asset('backside.jpg'));
+    map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4;
+    // 紙の地の色: 白×pk（テクスチャの色そのまま）。わずかに冷ましてろうそくの橙に焼けすぎないように
+    const tint = new THREE.Color(PARCH_TINT[0], PARCH_TINT[1], PARCH_TINT[2]).multiplyScalar(pk);
+    const mat = new THREE.MeshStandardMaterial({
+      name: 'M_Parchment', map, color: tint,
+      roughness: 1.0, metalness: 0, side: THREE.DoubleSide, envMapIntensity: 0.03 * ENV_K,
+    });
+    if (FX_PBR) {
+      const n = tl.load(asset('pbr/paper-normal.webp')); n.flipY = false; n.colorSpace = THREE.NoColorSpace;
+      n.wrapS = n.wrapT = THREE.RepeatWrapping; n.repeat.set(2, 2);
+      mat.normalMap = n; mat.normalScale = new THREE.Vector2(0.3, 0.3);
+    }
+    // 1枚目の表：名言のページ。テクスチャは setFirstPage() で差し替える（栞のページ）
+    const fm = mat.clone(); fm.name = 'M_FirstPage'; fm.map = null; fm.side = THREE.FrontSide;
+    this.firstMat = fm;
+    this.setFirstPage(asset('pages/p1.jpg'));
+    // 表紙側の向き（本の空間）: 紙の束の中心 → 表紙の中心
+    root.updateWorldMatrix(true, true);
+    const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
+    const ctr = (n: string): THREE.Vector3 | null => {
+      const o = root.getObjectByName(n); if (!o) return null;
+      return new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3()).applyMatrix4(inv);
+    };
+    const cf = ctr('Cover_Front'), pg = ctr('Pages');
+    const up = cf && pg ? cf.sub(pg).normalize() : null;
+    const targets: THREE.Mesh[] = [];
+    root.traverse(o => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh || !m.material) return;
+      if (m.name === 'Cover_Endpaper' || m.name === 'Page_First' || (m.material as THREE.Material).name === 'M_PageTop') targets.push(m);
+    });
+    for (const m of targets) {
+      const first = m.name === 'Page_First';
+      planarUV(m.geometry, first);   // 1枚目の絵は上下を返すと、天が本の上端・鏡なし（撮影で確認）
+      const c = mat.clone(); this.parchMats.push(c);
+      if (m.name === 'Cover_Endpaper') c.color.multiplyScalar(0.7);   // 見返しは立っていて正面から光を受けるので、さらに ×0.7
+      if (first && up) {
+        // 表紙側を向く三角形だけを group 0（名言の絵）に、残りを group 1（素の紙）に並べ替える
+        const nm = new THREE.Matrix3().getNormalMatrix(new THREE.Matrix4().copy(inv).multiply(m.matrixWorld));
+        splitByFacing(m.geometry, nm, up);
+        const cb = c.clone(); cb.side = THREE.FrontSide; this.parchMats.push(cb);
+        m.material = [fm, c, cb];
+      } else {
+        m.material = c;
+      }
+      if (m.name !== 'Cover_Endpaper') m.receiveShadow = false;
+    }
+  }
+  /** cover: 1枚目の表に貼る名言のページ（栞があればそのページ）。同じ URL なら何もしない */
+  setFirstPage(url: string): void {
+    if (!this.firstMat || url === this.firstPageUrl) return;
+    this.firstPageUrl = url;
+    new THREE.TextureLoader().load(url, t => {
+      if (url !== this.firstPageUrl || !this.firstMat) { t.dispose(); return; }
+      t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+      const old = this.firstMat.map; this.firstMat.map = t; this.firstMat.needsUpdate = true;
+      if (old) old.dispose();
+    });
+  }
+  /** cover: 表紙を開くクリップ（CoverOpen）を頭から再生。終わったら clamp で止まる */
+  coverPlay(): void { this.coverAct?.reset().play(); }
+  /** cover: クリップを止め、表紙と1枚目を手で回せる状態に戻す（rad） */
+  coverSet(cover: number, page: number): void {
+    this.coverAct?.stop();
+    if (this.hinge) this.hinge.rotation.z = cover;
+    if (this.pageHinge) this.pageHinge.rotation.z = page;
+  }
+  /** cover: 毎フレーム。ミキサーがある時だけ */
+  tickMixer(dt: number): void { if (this.mixer) this.mixer.update(dt); }
 
   private applyLeather(root: THREE.Object3D): void {
     const tl = new THREE.TextureLoader();
