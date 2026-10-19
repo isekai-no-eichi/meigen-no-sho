@@ -212,6 +212,8 @@ function beginRead(mode: string, title?: string): void {
   talk.classList.remove('show');
   activity(); pagesSession = 0; flipTimes = []; rushSeen = false;
   track('open_book', { mode });
+  // cover: 1枚目の名言はタップの時点で読みはじめる（開きはじめの 1.55s 前・2026-10-20 届く前の空白を減らす）
+  if (coverOn()) scene.setFirstPage(asset('pages/p' + (firstPageOf(mode) + 1) + '.jpg'));
   // 文字が消え、1秒ほど何もない「間」をおいてから、題名と開く演出を始める
   setTimeout(() => startOpening(mode, title), PRELUDE * 1000);
 }

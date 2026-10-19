@@ -412,6 +412,8 @@ export class BookScene {
    *  明るさ pk 0.3・見返しはさらに ×0.7・色は PARCH_TINT（暖色の光を打ち消す寒色寄り）。本番には切替スイッチを入れていない（試作版のみ） */
   private parchMats: THREE.MeshStandardMaterial[] = [];
   private firstMat: THREE.MeshStandardMaterial | null = null;
+  /** 1枚目の名言が届くまでの素の紙（backside.jpg・見返しと共有なので dispose しない） */
+  private paperMap: THREE.Texture | null = null;
   private firstPageUrl = '';
   private applyParchment(root: THREE.Object3D): void {
     const tl = new THREE.TextureLoader();
@@ -430,9 +432,9 @@ export class BookScene {
       mat.normalMap = n; mat.normalScale = new THREE.Vector2(0.3, 0.3);
     }
     // 1枚目の表：名言のページ。テクスチャは setFirstPage() で差し替える（栞のページ）
-    const fm = mat.clone(); fm.name = 'M_FirstPage'; fm.map = null; fm.side = THREE.FrontSide;
-    this.firstMat = fm;
-    this.setFirstPage(asset('pages/p1.jpg'));
+    // 2026-10-20: 既定の p1 を仮に貼ると、選んだページが届く前に別の名言が見えた（ヘッドレスで再現）→ 届くまでは素の紙
+    const fm = mat.clone(); fm.name = 'M_FirstPage'; fm.map = map; fm.side = THREE.FrontSide;
+    this.firstMat = fm; this.paperMap = map;
     // 表紙側の向き（本の空間）: 紙の束の中心 → 表紙の中心
     root.updateWorldMatrix(true, true);
     const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
@@ -469,11 +471,14 @@ export class BookScene {
   setFirstPage(url: string): void {
     if (!this.firstMat || url === this.firstPageUrl) return;
     this.firstPageUrl = url;
+    // 前の名言（前回開いたページ）を残さない：届くまで素の紙に戻す
+    const prev = this.firstMat.map;
+    if (prev !== this.paperMap) { this.firstMat.map = this.paperMap; this.firstMat.needsUpdate = true; if (prev) prev.dispose(); }
     new THREE.TextureLoader().load(url, t => {
       if (url !== this.firstPageUrl || !this.firstMat) { t.dispose(); return; }
       t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
       const old = this.firstMat.map; this.firstMat.map = t; this.firstMat.needsUpdate = true;
-      if (old) old.dispose();
+      if (old && old !== this.paperMap) old.dispose();
     });
   }
   /** cover: 表紙を開くクリップ（CoverOpen）を頭から再生。終わったら clamp で止まる */
