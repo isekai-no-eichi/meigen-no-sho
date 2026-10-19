@@ -19,6 +19,7 @@ import {
 import { track } from './track';
 import { initCounter } from './counter';
 import { fsEnter, fsOn } from './fullscreen';
+import { showRetry } from './ui/Retry';
 
 type Stage = 'book' | 'opening' | 'read' | 'closing';
 
@@ -366,11 +367,15 @@ if (GATE) {
   gate.show();
 }
 
-scene.load(() => {
-  scene.resize();
-  if (GATE) { scene.hideBook(); return; }  // 読み込み完了時にも本を消し直す（load が scale 1 にするため）
-  ui.start();
-});
+// 2026-10-19: 本の読み込みに失敗したら「読み込めなかった　もう一度」（ui/Retry.ts・?fx=0 では出ない）
+function loadBook(): void {
+  scene.load(() => {
+    scene.resize();
+    if (GATE) { scene.hideBook(); return; }  // 読み込み完了時にも本を消し直す（load が scale 1 にするため）
+    ui.start();
+  }, () => showRetry(loadBook));
+}
+loadBook();
 
 // F: 部屋の3Dは常に 30fps（2026-10-05 KEI）。動きは時間基準なので速さは同じ。読書のめくり canvas は別ループで全速のまま
 const FRAME_MIN = 1000 / 30 - 3;

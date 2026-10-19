@@ -17,7 +17,8 @@ import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { asset, MOBILE, QP, BUILD, PERF, loadFavs, hasBookmark, isUnlocked } from '../state';
+import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
+import { asset, MOBILE, QP, BUILD, PERF, loadFavs, hasBookmark, isUnlocked, fxOn } from '../state';
 import { RoomBackground } from './RoomBackground';
 
 /** 表紙の箔押しタイトル「名言の書」。2026-09-08 KEI「チャチい」→ 無し。戻す時は true */
@@ -48,6 +49,13 @@ const DIVE_DUR = 1.6;                     // ページの間へ潜る時間（�
 export const FLARE_GAIN = 0.5;
 /** ブルームの基準強度。2026-09-09 KEI: 開く時の右下のキラキラを半減 */
 const BLOOM_BASE = MOBILE ? 0.24 : 0.30;
+
+// ---- 2026-10-19 入口の3D演出（state.ts fxOn・?fx=0 で従来と同じ値・同じ処理）----
+/** env: 環境マップを Poly Haven fireplace_1k.hdr に。映り込みが暖炉の色になる分、強さは ×0.6 */
+const FX_ENV = fxOn();
+const ENV_K = FX_ENV ? 0.6 : 1;   // 0.8 では表紙と小口が橙に光りすぎた（2026-10-19 試作版で比較）
+/** pbr: 表紙に革目（ambientCG Leather037）を重ねた法線・roughness、小口に紙の重なりの法線 */
+const FX_PBR = fxOn();
 
 const GradeShader = {
   uniforms: {
@@ -258,7 +266,7 @@ export class BookScene {
     this.buildComposer();
   }
 
-  load(onReady: () => void): void {
+  load(onReady: () => void, onFail?: () => void): void {
     const glbOverride = QP.get('glb');
     // v2: 本体は Draco + WebP(1024) に落とした自ホスト版（4.18MB → 0.86MB）。
     //     デコーダも public/draco/ に同梱して自ホスト（CDN依存ゼロ）。
@@ -281,7 +289,7 @@ export class BookScene {
           if (mat.color) mat.color.multiplyScalar(0.86);
           // 2026-09-22 KEI「回している時、本に変な影が付く」→ 本は影を「落とす」だけにし、
           // 自分の影を「受けない」。机への柔らかい接地影はそのまま残る。
-          if (QUALITY) { m.castShadow = true; m.receiveShadow = BOOK_SELF_SHADOW; mat.envMapIntensity = 0.22; }
+          if (QUALITY) { m.castShadow = true; m.receiveShadow = BOOK_SELF_SHADOW; mat.envMapIntensity = 0.22 * ENV_K; }
         }
       });
       if (QUALITY) this.applyLeather(book);
@@ -310,20 +318,45 @@ export class BookScene {
         if (this.gradePass) this.gradePass.uniforms.uVig.value = qn('ivig', 0.08);
       }
       onReady();
+    }, undefined, err => {
+      // 2026-10-19: 取れなかった時は main.ts が「読み込めなかった　もう一度」を出す（?fx=0 では従来どおり何もしない）
+      console.warn('book.glb load failed', err);
+      if (onFail) onFail();
     });
   }
 
   private applyLeather(root: THREE.Object3D): void {
     const tl = new THREE.TextureLoader();
-    const nrm = tl.load(asset('cover-normal.webp')); nrm.flipY = false; nrm.colorSpace = THREE.NoColorSpace;
-    const rgh = tl.load(asset('cover-rough.jpg')); rgh.flipY = false; rgh.colorSpace = THREE.NoColorSpace;
+    // pbr: 既存の型押し（目の紋章）に革目を重ねて焼いた地図（scripts/build-assets.mjs pbr）。UV は既存と同じ
+    const nrm = tl.load(asset(FX_PBR ? 'pbr/cover-normal-pbr.webp' : 'cover-normal.webp')); nrm.flipY = false; nrm.colorSpace = THREE.NoColorSpace;
+    const rgh = tl.load(asset(FX_PBR ? 'pbr/cover-rough-pbr.webp' : 'cover-rough.jpg')); rgh.flipY = false; rgh.colorSpace = THREE.NoColorSpace;
+    if (FX_PBR) this.applyPagesPbr(root, tl);
     root.traverse(o => {
       const m = o as THREE.Mesh;
       if (!m.isMesh || !m.material) return;
       if (/Cover_Front|Cover_Back/.test(m.name)) {
         const mat = m.material as THREE.MeshStandardMaterial;
-        mat.normalMap = nrm; mat.normalScale = new THREE.Vector2(0.55, 0.55);
-        mat.roughnessMap = rgh; mat.roughness = 1.0; mat.envMapIntensity = 0.35; mat.needsUpdate = true;
+        mat.normalMap = nrm; mat.normalScale = FX_PBR ? new THREE.Vector2(0.8, 0.8) : new THREE.Vector2(0.55, 0.55);
+        mat.roughnessMap = rgh; mat.roughness = 1.0; mat.envMapIntensity = 0.35 * ENV_K; mat.needsUpdate = true;
+      }
+    });
+  }
+  /** pbr: 紙の束。小口（M_Pages）は1枚ずつの重なりの法線、上面（M_PageTop）は紙の凹凸を薄く（2026-10-19） */
+  private applyPagesPbr(root: THREE.Object3D, tl: THREE.TextureLoader): void {
+    const edge = tl.load(asset('pbr/edge-normal.webp')); edge.flipY = false; edge.colorSpace = THREE.NoColorSpace;
+    edge.wrapS = edge.wrapT = THREE.RepeatWrapping;
+    const paper = tl.load(asset('pbr/paper-normal.webp')); paper.flipY = false; paper.colorSpace = THREE.NoColorSpace;
+    paper.wrapS = paper.wrapT = THREE.RepeatWrapping; paper.repeat.set(2, 2);
+    root.traverse(o => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh || !m.material) return;
+      const mat = m.material as THREE.MeshStandardMaterial;
+      if (mat.name === 'M_Pages') {
+        mat.normalMap = edge; mat.normalScale = new THREE.Vector2(0.9, 0.9);
+        mat.roughness = 1.0; mat.needsUpdate = true;
+      } else if (mat.name === 'M_PageTop') {
+        mat.normalMap = paper; mat.normalScale = new THREE.Vector2(0.35, 0.35);
+        mat.roughness = 1.0; mat.needsUpdate = true;
       }
     });
   }
@@ -503,7 +536,7 @@ export class BookScene {
     this.favMarks = new THREE.Group();
     const bw = bb.max.x - bb.min.x, by = bb.max.y - bb.min.y, bz = bb.max.z - bb.min.z;
     const py = pb.max.y - pb.min.y, pz = pb.max.z - pb.min.z;
-    const mat = new THREE.MeshStandardMaterial({ color: 0xd9b25a, roughness: 0.35, metalness: 0.7, emissive: 0x3a2a08 });
+    const mat = new THREE.MeshStandardMaterial({ color: 0xd9b25a, roughness: 0.35, metalness: 0.7, emissive: 0x3a2a08, envMapIntensity: ENV_K });
     const dx = bw * 0.012;
     const geo = new THREE.BoxGeometry(dx, Math.max(0.0006, by * 0.006), bz * 0.028);
     favs.slice(0, 80).forEach((p, i) => {
@@ -688,6 +721,18 @@ export class BookScene {
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     pmrem.dispose();
+    if (FX_ENV) this.loadFireplaceEnv();
+  }
+
+  /** env: 暖炉の夜の部屋（Poly Haven fireplace 1K・CC0）。読み終わるまでは RoomEnvironment のまま。失敗しても旧のまま */
+  private loadFireplaceEnv(): void {
+    new HDRLoader().load(asset('env/fireplace_1k.hdr'), t => {
+      const pm = new THREE.PMREMGenerator(this.renderer);
+      const old = this.scene.environment;
+      this.scene.environment = pm.fromEquirectangular(t).texture;
+      t.dispose(); pm.dispose();
+      if (old) old.dispose();
+    }, undefined, () => { /* 旧の環境のまま */ });
   }
 
   /** ブルームの描画先を実解像度の半分に落とす（2026-09-09 軽量化）。resolution だけでは実サイズが変わらない */

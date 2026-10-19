@@ -365,3 +365,12 @@ body:not(.uiimg) #ui,body:not(.uiimg) #menu .frame,body:not(.uiimg) #favBtn,body
    本を開く時のタイトルカード（stage-opening）は 2026-09-13 KEI の指示どおり残す。
    <title>・OGP・manifest の名前は変えていない。 */
 body.stage-book #readTitle{display:none}
+
+/* 2026-10-19 「読み込めなかった　もう一度」: #hint と同じ位置・書体。押せる文字 */
+#retry{position:fixed;left:50%;top:66%;top:66dvh;transform:translate(-50%,-50%);z-index:40;display:none;flex-direction:column;align-items:center;
+  background:none;border:0;padding:10px 14px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+#retry.show{display:flex}
+#retry .txt{font-family:var(--serif);font-size:clamp(14px,4vmin,19px);letter-spacing:.26em;text-indent:.26em;font-weight:400;color:var(--gold2);
+  white-space:nowrap;text-shadow:0 1px 2px #000,0 0 12px rgba(0,0,0,.8)}
+#retry .rule{display:block;width:min(46vw,260px);height:1px;margin:14px auto 0;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+#retry:active .txt{color:#fff2c4}

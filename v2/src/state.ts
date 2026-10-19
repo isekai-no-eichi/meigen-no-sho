@@ -143,6 +143,8 @@ export const QP = new URLSearchParams(location.search);
 export const BUILD = '20260918v20';
 /** 負荷対策 A/B/C/F/G（2026-10-05 KEI）。?perf=0 で全部旧動作に戻す（実機での比較用） */
 export const PERF = QP.get('perf') !== '0';
+/** 2026-10-19 入口の3D演出（暖炉の反射・革と紙の質感・読み込み失敗の「もう一度」）。常時 ON。比較用に ?fx=0 だけ旧動作 */
+export function fxOn(): boolean { return QP.get('fx') !== '0'; }
 
 // 2026-09-09 KEI: BUILD を上げても栞・印・枚数は消さない（更新のたびに読者の記録が飛ぶ不具合）。
 // 記録するのは「どの版まで見たか」だけ。設定の形を変える時だけ、ここに移行処理を足す。
